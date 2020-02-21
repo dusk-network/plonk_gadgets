@@ -7,5 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-plonk = {git = "https://github.com/dusk-network/plonk"}
+plonk = {git = "https://github.com/dusk-network/plonk", branch = "refactor_api"}
 jubjub = {git = "https://github.com/zkcrypto/jubjub"}
+algebra = { git = "https://github.com/scipr-lab/zexe/", branch = "master", features = [ "parallel" ]}
