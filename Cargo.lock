@@ -240,6 +240,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "ff-fft",
+ "lazy_static",
  "merlin",
  "plonk",
  "poly-commit",

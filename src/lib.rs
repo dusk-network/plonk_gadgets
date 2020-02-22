@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_uninit_array)]
+
 use plonk::cs::{composer::StandardComposer as PlonkStandardComposer, proof::Proof as PlonkProof};
 
 pub use algebra::{

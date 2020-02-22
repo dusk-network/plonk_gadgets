@@ -12,3 +12,4 @@ algebra = { git = "https://github.com/scipr-lab/zexe/", features = [ "parallel" 
 ff-fft = { git = "https://github.com/scipr-lab/zexe/" }
 poly-commit = { git = "https://github.com/scipr-lab/poly-commit", branch = "master" }
 merlin = "2.0"
+lazy_static = "1.4"

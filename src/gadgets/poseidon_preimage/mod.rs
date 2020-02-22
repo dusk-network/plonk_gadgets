@@ -1,16 +1,94 @@
-use crate::{helpers, Curve, Proof, Scalar, StandardComposer};
+use crate::{helpers, Curve, Field, Proof, Scalar, StandardComposer};
 
 use ff_fft::EvaluationDomain;
 use merlin::Transcript;
 use plonk::cs::Composer;
 use poly_commit::kzg10::{Powers, VerifierKey};
 
+const POSEIDON_WIDTH: usize = 5;
+const FULL_ROUNDS: usize = 8;
+const PARTIAL_ROUNDS: usize = 59;
+const BITFLAGS: u8 = 0b1000;
+
+lazy_static::lazy_static! {
+    // TODO - Generate constants and MDS
+    static ref ROUND_CONSTANTS: [Scalar; 960] = [Scalar::one(); 960];
+    static ref MDS: [[Scalar; POSEIDON_WIDTH]; POSEIDON_WIDTH] = [[Scalar::from(17u64); POSEIDON_WIDTH]; POSEIDON_WIDTH];
+}
+
 pub fn poseidon(x: Scalar) -> Scalar {
-    // TODO - Implement Poseidon
-    let x = x + &Scalar::from(2u64);
-    let x = x * &Scalar::from(3u64);
-    let x = x + &Scalar::from(5u64);
-    x
+    let mut input = [Scalar::zero(); POSEIDON_WIDTH];
+    input[0] = Scalar::from(BITFLAGS);
+    input[1] = x;
+
+    let mut constants_offset = 0;
+
+    for _ in 0..FULL_ROUNDS / 2 {
+        input.iter_mut().for_each(|i| {
+            *i += &ROUND_CONSTANTS[constants_offset];
+
+            let j = *i;
+            for _ in 0..5 {
+                *i *= &j;
+            }
+
+            constants_offset += 1;
+        });
+
+        let mut product = [Scalar::zero(); POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                product[j] += &(MDS[j][k] * &input[k]);
+            }
+        }
+
+        input.copy_from_slice(&product);
+    }
+
+    for _ in 0..PARTIAL_ROUNDS {
+        input.iter_mut().for_each(|i| {
+            *i += &ROUND_CONSTANTS[constants_offset];
+            constants_offset += 1;
+        });
+
+        let j = input[POSEIDON_WIDTH - 1];
+        for _ in 0..5 {
+            input[POSEIDON_WIDTH - 1] *= &j;
+        }
+
+        let mut product = [Scalar::zero(); POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                product[j] += &(MDS[j][k] * &input[k]);
+            }
+        }
+
+        input.copy_from_slice(&product);
+    }
+
+    for _ in 0..FULL_ROUNDS / 2 {
+        input.iter_mut().for_each(|i| {
+            *i += &ROUND_CONSTANTS[constants_offset];
+
+            let j = *i;
+            for _ in 0..5 {
+                *i *= &j;
+            }
+
+            constants_offset += 1;
+        });
+
+        let mut product = [Scalar::zero(); POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                product[j] += &(MDS[j][k] * &input[k]);
+            }
+        }
+
+        input.copy_from_slice(&product);
+    }
+
+    input[1]
 }
 
 pub fn gen_transcript() -> Transcript {
@@ -18,17 +96,99 @@ pub fn gen_transcript() -> Transcript {
 }
 
 pub fn poseidon_gadget(composer: &mut StandardComposer, x: Option<Scalar>, h: Scalar) {
-    let a = composer.add_input(x.unwrap_or_default());
-    let b = composer.add_input(Scalar::from(2u64));
-    let o = helpers::add_gate(composer, a, b);
+    let mut input = [Scalar::zero(); POSEIDON_WIDTH];
+    input[0] = Scalar::from(BITFLAGS);
+    input[1] = x.unwrap_or_default();
 
-    let b = composer.add_input(Scalar::from(3u64));
-    let o = helpers::mul_gate(composer, o, b);
+    let zero = composer.add_input(Scalar::zero());
+    let mut buf = [zero; POSEIDON_WIDTH];
 
-    let b = composer.add_input(Scalar::from(5u64));
-    let o = helpers::add_gate(composer, o, b);
+    buf.iter_mut()
+        .enumerate()
+        .for_each(|(i, item)| *item = composer.add_input(input[i]));
 
-    helpers::constrain_gate(composer, o, h);
+    let mut constants_offset = 0;
+
+    for _ in 0..FULL_ROUNDS / 2 {
+        buf.iter_mut().for_each(|i| {
+            let b = composer.add_input(ROUND_CONSTANTS[constants_offset]);
+            let mut o = helpers::add_gate(composer, *i, b);
+
+            let j = o;
+            for _ in 0..5 {
+                o = helpers::mul_gate(composer, o, j);
+            }
+
+            *i = o;
+            constants_offset += 1;
+        });
+
+        let mut product = [zero; POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                let a = composer.add_input(MDS[j][k]);
+                let o = helpers::mul_gate(composer, a, buf[k]);
+                let o = helpers::add_gate(composer, product[j], o);
+                product[j] = o;
+            }
+        }
+
+        buf.copy_from_slice(&product);
+    }
+
+    for _ in 0..PARTIAL_ROUNDS {
+        buf.iter_mut().for_each(|i| {
+            let b = composer.add_input(ROUND_CONSTANTS[constants_offset]);
+            *i = helpers::add_gate(composer, *i, b);
+            constants_offset += 1;
+        });
+
+        let j = buf[POSEIDON_WIDTH - 1];
+        for _ in 0..5 {
+            buf[POSEIDON_WIDTH - 1] = helpers::mul_gate(composer, buf[POSEIDON_WIDTH - 1], j);
+        }
+
+        let mut product = [zero; POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                let a = composer.add_input(MDS[j][k]);
+                let o = helpers::mul_gate(composer, a, buf[k]);
+                let o = helpers::add_gate(composer, product[j], o);
+                product[j] = o;
+            }
+        }
+
+        buf.copy_from_slice(&product);
+    }
+
+    for _ in 0..FULL_ROUNDS / 2 {
+        buf.iter_mut().for_each(|i| {
+            let b = composer.add_input(ROUND_CONSTANTS[constants_offset]);
+            let mut o = helpers::add_gate(composer, *i, b);
+
+            let j = o;
+            for _ in 0..5 {
+                o = helpers::mul_gate(composer, o, j);
+            }
+
+            *i = o;
+            constants_offset += 1;
+        });
+
+        let mut product = [zero; POSEIDON_WIDTH];
+        for j in 0..POSEIDON_WIDTH {
+            for k in 0..POSEIDON_WIDTH {
+                let a = composer.add_input(MDS[j][k]);
+                let o = helpers::mul_gate(composer, a, buf[k]);
+                let o = helpers::add_gate(composer, product[j], o);
+                product[j] = o;
+            }
+        }
+
+        buf.copy_from_slice(&product);
+    }
+
+    helpers::constrain_gate(composer, buf[1], h);
 }
 
 pub fn prove(domain: &EvaluationDomain<Scalar>, ck: &Powers<Curve>, x: Scalar, h: Scalar) -> Proof {
@@ -93,9 +253,9 @@ mod tests {
     fn poseidon_preimage() {
         // Trusted setup
         // TODO - Create a trusted setup struct
-        let public_parameters = srs::setup(32);
-        let (ck, vk) = srs::trim(&public_parameters, 32).unwrap();
-        let domain: EvaluationDomain<Scalar> = EvaluationDomain::new(10).unwrap();
+        let public_parameters = srs::setup(8192);
+        let (ck, vk) = srs::trim(&public_parameters, 8192).unwrap();
+        let domain: EvaluationDomain<Scalar> = EvaluationDomain::new(4100).unwrap();
 
         let x = Scalar::from(31u64);
         let h = super::poseidon(x);
