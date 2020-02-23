@@ -454,6 +454,123 @@ impl JubJubPointGadget<Fq> {
             Fq::zero(),
         );
     }
+    /// Adds constraints to ensure that the point satisfies the JubJub curve eq
+    /// by verifying `(aX^{2}+Y^{2})Z^{2} = Z^{4}+d(X^{2})Y^{2}`
+    pub fn satisfy_curve_eq(&self, composer: &mut StandardComposer<Bls12_381>) {
+        // Add a & d curve params to the circuit or get the reference if
+        // they've been already committed
+        let a = composer.add_input(JubJubParameters::COEFF_A);
+        let d = composer.add_input(JubJubParameters::COEFF_D);
+
+        // Compute X²
+        let (_, _, x_sq) = composer.mul_gate(
+            self.X.clone(),
+            self.X.clone(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+
+        // Compute a * X²
+        let (_, _, a_x_sq) = composer.mul_gate(
+            x_sq.into(),
+            a.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute Y²
+        let (_, _, y_sq) = composer.mul_gate(
+            self.Y.clone(),
+            self.Y.clone(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute a*X² + Y²
+        let (_, _, a_xsq_ysq) = composer.add_gate(
+            a_x_sq.into(),
+            y_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute Z²
+        let (_, _, z_sq) = composer.mul_gate(
+            self.Z.clone(),
+            self.Z.clone(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute left assigment
+        let (_, _, left_assig) = composer.mul_gate(
+            a_xsq_ysq.into(),
+            z_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+
+        // Compute Z⁴
+        let (_, _, z_sq_sq) = composer.mul_gate(
+            z_sq.into(),
+            z_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute d(X²)
+        let (_, _, d_x_sq) = composer.mul_gate(
+            d.into(),
+            x_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute d*(X²) * Y²
+        let (_, _, d_x_sq_y_sq) = composer.mul_gate(
+            d_x_sq.into(),
+            y_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Compute right assigment
+        let (_, _, right_assig) = composer.add_gate(
+            z_sq_sq.into(),
+            d_x_sq_y_sq.into(),
+            Fq::one(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+        // Create Variable 0
+        let var_zero = composer.add_input(Fq::zero());
+        // Constrain right_assig = left_assig
+        composer.poly_gate(
+            left_assig.into(),
+            right_assig.into(),
+            var_zero.into(),
+            Fq::zero(),
+            -Fq::one(),
+            Fq::one(),
+            Fq::one(),
+            Fq::zero(),
+            Fq::zero(),
+        );
+    }
 }
 
 mod tests {
@@ -524,6 +641,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn dummy_test() {
         let mut composer = StandardComposer::<Bls12_381>::new();
         let one = composer.add_input(Fq::one());
