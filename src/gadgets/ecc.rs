@@ -9,7 +9,8 @@ use plonk::cs::composer::StandardComposer;
 use plonk::cs::constraint_system::LinearCombination as LC;
 
 pub type Bls12_381Composer = StandardComposer<Bls12_381>;
-// Represents a JubJub Point using Twisted Edwards Extended Coordinates
+/// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
+/// Each one of the coordinates is represented by a `LinearCombination<PrimeField>`
 pub struct JubJubPointGadget<Fq: algebra::fields::PrimeField> {
     pub X: LC<Fq>,
     pub Y: LC<Fq>,
@@ -401,7 +402,8 @@ impl JubJubPointGadget<Fq> {
             T: new_t.into(),
         }
     }
-    // self.x * other.z = other.x * self.z AND self.y * other.z == other.y * self.z
+    /// Checks the equalty between two JubJub points in TwEdws Extended Coords according
+    /// to the eq: `self.x * other.z = other.x * self.z AND self.y * other.z == other.y * self.z`
     pub fn equal(&self, composer: &mut Bls12_381Composer, other: &JubJubPointGadget<Fq>) {
         let (_, other_z, a) = composer.mul_gate(
             self.X.clone(),
@@ -574,6 +576,36 @@ impl JubJubPointGadget<Fq> {
         );
     }
 
+    /// Gets an Scalar represented as a BoolVar array in Big Endian
+    /// and performs an ECC scalar multiplication.
+    pub fn scalar_mul(
+        &self,
+        composer: &mut StandardComposer<Bls12_381>,
+        scalar: &[BoolVar],
+    ) -> JubJubPointGadget<Fq> {
+        let zero = composer.add_input(Fq::zero());
+        let one = composer.add_input(Fq::one());
+
+        let mut Q = JubJubPointGadget {
+            X: zero.into(),
+            Y: one.into(),
+            Z: one.into(),
+            T: zero.into(),
+        };
+
+        for bit in scalar {
+            Q = Q.double(composer);
+            // If bit == 1 -> Q = Q + point
+            let point_or_id = self.conditionally_select_identity(composer, *bit);
+            Q = Q.add(composer, &point_or_id);
+        }
+        Q
+    }
+
+    /// Conditionally selects the point or the identity point according to
+    /// the selector bit.
+    /// P' = P <=> bit = 1
+    /// P' = Identity <=> bit = 0
     pub fn conditionally_select_identity(
         &self,
         composer: &mut Bls12_381Composer,

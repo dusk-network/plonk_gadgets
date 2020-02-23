@@ -1,7 +1,4 @@
-use algebra::curves::bls12_381::Bls12_381;
 use algebra::fields::jubjub::fq::Fq;
-use num_traits::{One, Zero};
-use plonk::cs::composer::StandardComposer;
 use plonk::cs::constraint_system::{LinearCombination, Variable};
 
 /// Represents a Variable that has already
