@@ -1,8 +1,9 @@
 use algebra::curves::bls12_381::Bls12_381;
-use algebra::fields::jubjub::fq::Fq;
+use algebra::fields::{jubjub::fq::Fq, PrimeField};
 use num_traits::{One, Zero};
 use plonk::cs::composer::StandardComposer;
 use plonk::cs::constraint_system::{LinearCombination as LC, Variable};
+use rand::RngCore;
 
 /// Conditionally selects the value provided or a zero instead.
 /// NOTE that the `select` input has to be previously constrained to
@@ -56,4 +57,31 @@ pub fn conditionally_select_one(
             Fq::zero(),
         )
         .2
+}
+
+/// Adds constraints to the CS which check that a Variable != 0
+pub fn is_non_zero(
+    composer: &mut StandardComposer<Bls12_381>,
+    var: LC<Fq>,
+    var_assigment: Option<Fq>,
+) {
+    let one = composer.add_input(Fq::one());
+    // XXX: We use this Fq random obtention but we will use the random variable generator
+    // that we will include in the PLONK API on the future.
+    let inv = var_assigment.unwrap_or_else(|| {
+        Fq::from_random_bytes(&rand::thread_rng().next_u64().to_le_bytes()).unwrap()
+    });
+    let inv_var = composer.add_input(inv);
+    // Var * Inv(Var) = 1
+    composer.poly_gate(
+        var,
+        inv_var.into(),
+        one.into(),
+        Fq::one(),
+        Fq::zero(),
+        Fq::zero(),
+        Fq::one(),
+        Fq::zero(),
+        Fq::zero(),
+    );
 }
