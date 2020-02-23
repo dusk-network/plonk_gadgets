@@ -1,3 +1,4 @@
+use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::scalar::*;
 use algebra::curves::bls12_381::Bls12_381;
 use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
@@ -44,7 +45,7 @@ impl JubJubPointGadget<Fq> {
         // X3 = E * F , Y3 = G * H, Z3 = F * G, T3 = E * H
         //
         // Compute A
-        let (A, X, other_x) = composer.mul_gate(
+        let (X, other_x, A) = composer.mul_gate(
             self.X.clone(),
             other.X.clone(),
             Fq::one(),
@@ -576,29 +577,29 @@ impl JubJubPointGadget<Fq> {
     pub fn conditionally_select_identity(
         &self,
         composer: &mut Bls12_381Composer,
-        selector: LC<Fq>,
+        selector: BoolVar,
     ) -> Self {
         let one = composer.add_input(Fq::one());
 
         // x' = x if bit = 1
         // x' = 0 if bit = 0 =>
         // x' = x * bit
-        let x_prime = conditionally_select_zero(composer, self.X.clone(), selector.clone());
+        let x_prime = conditionally_select_zero(composer, self.X.clone(), selector.into());
 
         // y' = y if bit = 1
         // y' = 1 if bit = 0 =>
         // y' = bit * y + (1 - bit)
-        let y_prime = conditionally_select_one(composer, self.X.clone(), selector.clone());
+        let y_prime = conditionally_select_one(composer, self.X.clone(), selector.into());
 
         // z' = z if bit = 1
         // z' = 1 if bit = 0 =>
         // z' = bit * z + (1 - bit)
-        let z_prime = conditionally_select_one(composer, self.X.clone(), selector.clone());
+        let z_prime = conditionally_select_one(composer, self.X.clone(), selector.into());
 
         // t' = t if bit = 1
         // t' = 0 if bit = 0 =>
         // t' = t * bit
-        let t_prime = conditionally_select_zero(composer, self.X.clone(), selector);
+        let t_prime = conditionally_select_zero(composer, self.X.clone(), selector.into());
 
         JubJubPointGadget {
             X: x_prime.into(),
