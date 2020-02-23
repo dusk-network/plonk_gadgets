@@ -1,3 +1,4 @@
+use crate::gadgets::scalar::*;
 use algebra::curves::bls12_381::Bls12_381;
 use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
 use algebra::curves::models::TEModelParameters;
@@ -25,7 +26,7 @@ impl JubJubPointGadget<Fq> {
         }
     }
 
-    pub fn add(&self, other: &Self, composer: &mut Bls12_381Composer) -> JubJubPointGadget<Fq> {
+    pub fn add(&self, composer: &mut Bls12_381Composer, other: &Self) -> JubJubPointGadget<Fq> {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
         let a = composer.add_input(JubJubParameters::COEFF_A);
@@ -400,7 +401,7 @@ impl JubJubPointGadget<Fq> {
         }
     }
     // self.x * other.z = other.x * self.z AND self.y * other.z == other.y * self.z
-    pub fn equal(&self, other: &JubJubPointGadget<Fq>, composer: &mut StandardComposer<Bls12_381>) {
+    pub fn equal(&self, composer: &mut Bls12_381Composer, other: &JubJubPointGadget<Fq>) {
         let (_, other_z, a) = composer.mul_gate(
             self.X.clone(),
             other.Z.clone(),
@@ -456,7 +457,7 @@ impl JubJubPointGadget<Fq> {
     }
     /// Adds constraints to ensure that the point satisfies the JubJub curve eq
     /// by verifying `(aX^{2}+Y^{2})Z^{2} = Z^{4}+d(X^{2})Y^{2}`
-    pub fn satisfy_curve_eq(&self, composer: &mut StandardComposer<Bls12_381>) {
+    pub fn satisfy_curve_eq(&self, composer: &mut Bls12_381Composer) {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
         let a = composer.add_input(JubJubParameters::COEFF_A);
@@ -571,6 +572,41 @@ impl JubJubPointGadget<Fq> {
             Fq::zero(),
         );
     }
+
+    pub fn conditionally_select_identity(
+        &self,
+        composer: &mut Bls12_381Composer,
+        selector: LC<Fq>,
+    ) -> Self {
+        let one = composer.add_input(Fq::one());
+
+        // x' = x if bit = 1
+        // x' = 0 if bit = 0 =>
+        // x' = x * bit
+        let x_prime = conditionally_select_zero(composer, self.X.clone(), selector.clone());
+
+        // y' = y if bit = 1
+        // y' = 1 if bit = 0 =>
+        // y' = bit * y + (1 - bit)
+        let y_prime = conditionally_select_one(composer, self.X.clone(), selector.clone());
+
+        // z' = z if bit = 1
+        // z' = 1 if bit = 0 =>
+        // z' = bit * z + (1 - bit)
+        let z_prime = conditionally_select_one(composer, self.X.clone(), selector.clone());
+
+        // t' = t if bit = 1
+        // t' = 0 if bit = 0 =>
+        // t' = t * bit
+        let t_prime = conditionally_select_zero(composer, self.X.clone(), selector);
+
+        JubJubPointGadget {
+            X: x_prime.into(),
+            Y: y_prime.into(),
+            Z: z_prime.into(),
+            T: t_prime.into(),
+        }
+    }
 }
 
 mod tests {
@@ -587,7 +623,7 @@ mod tests {
     }
 
     fn prove(
-        composer: &mut StandardComposer<Bls12_381>,
+        composer: &mut Bls12_381Composer,
     ) -> (
         Proof<Bls12_381>,
         UniversalParams<Bls12_381>,
@@ -619,7 +655,7 @@ mod tests {
     }
 
     fn verify(
-        composer: &mut StandardComposer<Bls12_381>,
+        composer: &mut Bls12_381Composer,
         public_params: UniversalParams<Bls12_381>,
         proof: Proof<Bls12_381>,
         pub_inputs: &Vec<Fq>,
