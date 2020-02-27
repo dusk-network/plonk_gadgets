@@ -1,4 +1,4 @@
-use crate::{helpers, Curve, Field, Proof, Scalar, StandardComposer};
+use crate::{helpers, Curve, Field, PreProcessedCircuit, Proof, Scalar, StandardComposer};
 
 use ff_fft::EvaluationDomain;
 use merlin::Transcript;
@@ -191,6 +191,25 @@ pub fn poseidon_gadget(composer: &mut StandardComposer, x: Option<Scalar>, h: Sc
     helpers::constrain_gate(composer, buf[1], h);
 }
 
+pub fn circuit(
+    domain: &EvaluationDomain<Scalar>,
+    ck: &Powers<Curve>,
+    h: Scalar,
+) -> (Transcript, PreProcessedCircuit, Vec<Scalar>) {
+    let mut transcript = gen_transcript();
+    let mut composer = StandardComposer::new();
+
+    poseidon_gadget(&mut composer, None, h);
+    composer.add_dummy_constraints();
+    composer.add_dummy_constraints();
+    composer.add_dummy_constraints();
+
+    let pi = composer.public_inputs().to_vec();
+    let circuit = composer.preprocess(&ck, &mut transcript, &domain);
+
+    (transcript, circuit, pi)
+}
+
 pub fn prove(domain: &EvaluationDomain<Scalar>, ck: &Powers<Curve>, x: Scalar, h: Scalar) -> Proof {
     let mut transcript = gen_transcript();
     let mut composer = StandardComposer::new();
@@ -205,33 +224,20 @@ pub fn prove(domain: &EvaluationDomain<Scalar>, ck: &Powers<Curve>, x: Scalar, h
 }
 
 pub fn verify(
-    domain: &EvaluationDomain<Scalar>,
-    ck: &Powers<Curve>,
+    transcript: &mut Transcript,
+    circuit: &PreProcessedCircuit,
     vk: &VerifierKey<Curve>,
     proof: &Proof,
-    h: Scalar,
+    pi: &[Scalar],
 ) -> bool {
-    let mut transcript = gen_transcript();
-    let mut composer = StandardComposer::new();
-
-    poseidon_gadget(&mut composer, None, h);
-    composer.add_dummy_constraints();
-    composer.add_dummy_constraints();
-    composer.add_dummy_constraints();
-
-    let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
-    proof.verify(
-        &preprocessed_circuit,
-        &mut transcript,
-        vk,
-        composer.public_inputs(),
-    )
+    proof.verify(&circuit, transcript, vk, pi)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::Scalar;
 
+    use algebra::fields::Field;
     use ff_fft::EvaluationDomain;
     use plonk::srs;
 
@@ -256,6 +262,9 @@ mod tests {
         let public_parameters = srs::setup(8192);
         let (ck, vk) = srs::trim(&public_parameters, 8192).unwrap();
         let domain: EvaluationDomain<Scalar> = EvaluationDomain::new(4100).unwrap();
+        let e = super::poseidon(Scalar::zero());
+        let (transcript, circuit, mut pi) = super::circuit(&domain, &ck, e);
+        let pi_h = pi.iter().position(|p| p == &e).unwrap();
 
         let x = Scalar::from(31u64);
         let h = super::poseidon(x);
@@ -264,21 +273,56 @@ mod tests {
         let i = super::poseidon(y);
 
         let proof = super::prove(&domain, &ck, x, h);
-        assert!(super::verify(&domain, &ck, &vk, &proof, h));
+        pi[pi_h] = h;
+        assert!(super::verify(
+            &mut transcript.clone(),
+            &circuit,
+            &vk,
+            &proof,
+            pi.as_slice()
+        ));
 
         let proof = super::prove(&domain, &ck, y, i);
-        assert!(super::verify(&domain, &ck, &vk, &proof, i));
+        pi[pi_h] = i;
+        assert!(super::verify(
+            &mut transcript.clone(),
+            &circuit,
+            &vk,
+            &proof,
+            pi.as_slice()
+        ));
 
         // Wrong pre-image
         let wrong_proof = super::prove(&domain, &ck, y, h);
-        assert!(!super::verify(&domain, &ck, &vk, &wrong_proof, h));
+        pi[pi_h] = h;
+        assert!(!super::verify(
+            &mut transcript.clone(),
+            &circuit,
+            &vk,
+            &wrong_proof,
+            pi.as_slice()
+        ));
 
         // Wrong public image
         let wrong_proof = super::prove(&domain, &ck, x, i);
-        assert!(!super::verify(&domain, &ck, &vk, &wrong_proof, i));
+        pi[pi_h] = i;
+        assert!(!super::verify(
+            &mut transcript.clone(),
+            &circuit,
+            &vk,
+            &wrong_proof,
+            pi.as_slice()
+        ));
 
         // Inconsistent public image
         let proof = super::prove(&domain, &ck, x, h);
-        assert!(!super::verify(&domain, &ck, &vk, &proof, i));
+        pi[pi_h] = i;
+        assert!(!super::verify(
+            &mut transcript.clone(),
+            &circuit,
+            &vk,
+            &proof,
+            pi.as_slice()
+        ));
     }
 }

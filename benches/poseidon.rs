@@ -1,7 +1,9 @@
-use plonk_gadgets::{gadgets::poseidon_preimage, Curve, Proof, Scalar};
+use plonk_gadgets::{gadgets::poseidon_preimage, Curve, PreProcessedCircuit, Proof, Scalar};
 
+use algebra::fields::Field;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ff_fft::domain::EvaluationDomain;
+use merlin::Transcript;
 use plonk::srs;
 use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
 
@@ -16,14 +18,16 @@ fn poseidon_prove(
 }
 
 fn poseidon_verify(
-    _public_parameters: &UniversalParams<Curve>,
-    domain: &EvaluationDomain<Scalar>,
-    ck: &Powers<Curve>,
+    transcript: &Transcript,
+    circuit: &PreProcessedCircuit,
     vk: &VerifierKey<Curve>,
     proof: &Proof,
-    h: Scalar,
+    pi: &[Scalar],
 ) -> bool {
-    poseidon_preimage::verify(domain, ck, vk, &proof, h)
+    let mut transcript = transcript.clone();
+    let ok = poseidon_preimage::verify(&mut transcript, circuit, vk, proof, pi);
+    assert!(ok);
+    ok
 }
 
 fn benchmark_poseidon(c: &mut Criterion) {
@@ -35,12 +39,17 @@ fn benchmark_poseidon(c: &mut Criterion) {
     let h = poseidon_preimage::poseidon(x);
     let proof = poseidon_prove(&public_parameters, &domain, &ck, x, h);
 
+    let e = poseidon_preimage::poseidon(Scalar::zero());
+    let (transcript, circuit, mut pi) = poseidon_preimage::circuit(&domain, &ck, e);
+    let pi_h = pi.iter().position(|p| p == &e).unwrap();
+    pi[pi_h] = h;
+
     c.bench_function("poseidon prove 8192 gates 4100 coef", |b| {
         b.iter(|| poseidon_prove(&public_parameters, &domain, &ck, black_box(x), black_box(h)))
     });
 
     c.bench_function("poseidon verify 8192 gates 4100 coef", |b| {
-        b.iter(|| poseidon_verify(&public_parameters, &domain, &ck, &vk, &proof, black_box(h)))
+        b.iter(|| poseidon_verify(&transcript, &circuit, &vk, &proof, black_box(pi.as_slice())))
     });
 }
 
