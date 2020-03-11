@@ -74,9 +74,11 @@ pub fn is_non_zero(
     let one = composer.add_input(Fr::one());
     // XXX: We use this Fq random obtention but we will use the random variable generator
     // that we will include in the PLONK API on the future.
-    let inv = var_assigment.unwrap_or_else(|| {
-        Fr::from_random_bytes(&rand::thread_rng().next_u64().to_le_bytes()).unwrap()
-    });
+    let inv = match var_assigment {
+        Some(fr) => fr,
+        // XXX: Should be a randomly generated variable
+        None => Fr::from(127u8),
+    };
     let inv_var = composer.add_input(inv);
     // Var * Inv(Var) = 1
     composer.poly_gate(
@@ -86,7 +88,7 @@ pub fn is_non_zero(
         Fr::one(),
         Fr::zero(),
         Fr::zero(),
-        Fr::one(),
+        -Fr::one(),
         Fr::zero(),
         Fr::zero(),
     );
@@ -298,5 +300,67 @@ mod tests {
 
         assert!(cond_select_one_roundtrip_helper(two, one, two));
         assert!(cond_select_one_roundtrip_helper(two, zero, one));
+    }
+
+    fn prove_is_non_zero(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        num: Fr,
+        inv_num: Fr,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(num);
+        is_non_zero(&mut composer, num, Some(inv_num));
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_is_non_zero(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        num: Fr,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(Fr::from_str("46").unwrap());
+        is_non_zero(&mut composer, num, None);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fr::zero()],
+        )
+    }
+
+    fn is_non_zero_roundtrip_helper(num: Fr, inv_num: Fr) -> bool {
+        let public_parameters = setup(16, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+
+        let proof = prove_is_non_zero(&domain, &ck, num, inv_num);
+        verify_is_non_zero(&domain, &ck, &vk, &proof, num)
+    }
+
+    #[test]
+    fn test_is_non_zero() {
+        let one = Fr::one();
+        let three = Fr::from(3u8);
+        let zero = Fr::zero();
+        use algebra::fields::Field;
+        let inv_three = three.inverse().unwrap();
+
+        assert!(is_non_zero_roundtrip_helper(one, one));
+        assert!(is_non_zero_roundtrip_helper(three, inv_three));
+        assert!(!is_non_zero_roundtrip_helper(zero, one));
     }
 }
