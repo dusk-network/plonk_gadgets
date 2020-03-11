@@ -30,34 +30,36 @@ pub fn conditionally_select_zero(
 /// y' = bit * y + (1 - bit)
 pub fn conditionally_select_one(
     composer: &mut StandardComposer<Bls12_381>,
-    x: Variable,
+    y: Variable,
     select: BoolVar,
 ) -> Variable {
     let one = composer.add_input(Fr::one());
-
-    let bit_t_x = composer.mul(
-        x,
+    // bit * y
+    let bit_y = composer.mul(
         select.into(),
+        y,
         Fr::one(),
-        Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
-    );
-    let bit_ty_one = composer.add(
-        bit_t_x.into(),
-        one.into(),
-        Fr::one(),
-        Fr::one(),
-        Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
-    );
-    composer.add(
-        bit_ty_one,
-        select.into(),
         -Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
+    );
+    // 1 - bit
+    let one_min_bit = composer.add(
+        one,
+        select.into(),
+        Fr::one(),
+        -Fr::one(),
+        -Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
+    );
+    // bit * y + (1 - bit)
+    composer.add(
+        bit_y,
+        one_min_bit,
         Fr::one(),
         Fr::one(),
+        -Fr::one(),
         Fr::zero(),
         Fr::zero(),
     )
@@ -230,5 +232,71 @@ mod tests {
 
         assert!(cond_select_zero_roundtrip_helper(two, one, two));
         assert!(cond_select_zero_roundtrip_helper(two, zero, zero));
+    }
+
+    fn prove_cond_select_one(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        num: Fr,
+        select: Fr,
+        expected: Fr,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(num);
+        let select = composer.add_input(select);
+        let select = binary_constrain(&mut composer, select.into());
+        let selected = conditionally_select_one(&mut composer, num, select.into());
+        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_cond_select_one(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        expected: Fr,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(Fr::from_str("46").unwrap());
+        let select = composer.add_input(Fr::from_str("36").unwrap());
+        let select = binary_constrain(&mut composer, select.into());
+        let selected = conditionally_select_one(&mut composer, num, select.into());
+        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fr::zero()],
+        )
+    }
+
+    fn cond_select_one_roundtrip_helper(num: Fr, selector: Fr, expected: Fr) -> bool {
+        let public_parameters = setup(16, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+
+        let proof = prove_cond_select_one(&domain, &ck, num, selector, expected);
+        verify_cond_select_one(&domain, &ck, &vk, &proof, expected)
+    }
+
+    #[test]
+    fn test_conditionally_select_one() {
+        let one = Fr::one();
+        let two = one + one;
+        let zero = Fr::zero();
+
+        assert!(cond_select_one_roundtrip_helper(two, one, two));
+        assert!(cond_select_one_roundtrip_helper(two, zero, one));
     }
 }
