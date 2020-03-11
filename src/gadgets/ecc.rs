@@ -3,36 +3,36 @@ use crate::gadgets::scalar::*;
 use algebra::curves::bls12_381::Bls12_381;
 use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
 use algebra::curves::models::TEModelParameters;
-use algebra::fields::jubjub::fq::Fq;
+use algebra::fields::bls12_381::Fr;
 use num_traits::{One, Zero};
 use plonk::cs::composer::StandardComposer;
-use plonk::cs::constraint_system::LinearCombination as LC;
+use plonk::cs::constraint_system::Variable;
 
 pub type Bls12_381Composer = StandardComposer<Bls12_381>;
 /// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
 /// Each one of the coordinates is represented by a `LinearCombination<PrimeField>`
-pub struct JubJubPointGadget<Fq: algebra::fields::PrimeField> {
-    pub X: LC<Fq>,
-    pub Y: LC<Fq>,
-    pub Z: LC<Fq>,
-    pub T: LC<Fq>,
+pub struct JubJubPointGadget {
+    pub X: Variable,
+    pub Y: Variable,
+    pub Z: Variable,
+    pub T: Variable,
 }
 
-impl JubJubPointGadget<Fq> {
-    pub fn from_point(point: &JubJubProjective, composer: &mut Bls12_381Composer) -> Self {
+impl JubJubPointGadget {
+    pub fn from_point(composer: &mut Bls12_381Composer, point: &JubJubProjective) -> Self {
         JubJubPointGadget {
-            X: composer.add_input(point.x).into(),
-            Y: composer.add_input(point.y).into(),
-            Z: composer.add_input(point.z).into(),
-            T: composer.add_input(point.t).into(),
+            X: composer.add_input(point.x),
+            Y: composer.add_input(point.y),
+            Z: composer.add_input(point.z),
+            T: composer.add_input(point.t),
         }
     }
 
-    pub fn add(&self, composer: &mut Bls12_381Composer, other: &Self) -> JubJubPointGadget<Fq> {
+    pub fn add(&self, composer: &mut Bls12_381Composer, other: &Self) -> JubJubPointGadget {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
-        let a = composer.add_input(JubJubParameters::COEFF_A);
-        let d = composer.add_input(JubJubParameters::COEFF_D);
+        let coeff_a = JubJubParameters::COEFF_A;
+        let coeff_d = JubJubParameters::COEFF_D;
 
         // Point addition impl
         // A = p1_x * p2_x
@@ -46,186 +46,125 @@ impl JubJubPointGadget<Fq> {
         // X3 = E * F , Y3 = G * H, Z3 = F * G, T3 = E * H
         //
         // Compute A
-        let (X, other_x, A) = composer.mul_gate(
-            self.X.clone(),
-            other.X.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let A = composer.mul(
+            self.X,
+            other.X,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute B
-        let (Y, other_y, B) = composer.mul_gate(
-            self.Y.clone(),
-            other.Y.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let B = composer.mul(
+            self.Y,
+            other.Y,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute C
-        let (_, _, pt) = composer.mul_gate(
-            self.T.clone(),
-            other.T.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, C) = composer.mul_gate(
-            pt.into(),
-            d.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let C = composer.mul(self.T, other.T, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
         // Compute D
-        let (_, _, D) = composer.mul_gate(
-            self.Z.clone(),
-            other.Z.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let D = composer.mul(
+            self.Z,
+            other.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute E
         let E = {
-            let (_, _, E1) = composer.add_gate(
-                X.into(),
-                Y.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
+            let E1 = composer.add(
+                self.X,
+                self.Y,
+                Fr::one(),
+                Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
             );
-            let (_, _, E2) = composer.add_gate(
-                other_x.into(),
-                other_y.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
+            let E2 = composer.add(
+                other.X,
+                other.Y,
+                Fr::one(),
+                Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
             );
-            let (_, _, E12) = composer.mul_gate(
-                E1.into(),
-                E2.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            );
-            let (_, _, aA) = composer.mul_gate(
-                a.into(),
-                A.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            );
-            let (_, _, aB) = composer.mul_gate(
-                a.into(),
-                B.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            );
-            // XXX: This can be translated to one single gate if we accept `q_c` as LC instead of E::Fr in plonk
-            let (_, _, aAaB) = composer.add_gate(
-                aA.into(),
-                aB.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            );
+            let E12 = composer.mul(E1, E2, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+            // aA + aB
+            let aAaB = composer.add(A, B, coeff_a, coeff_a, -Fr::one(), Fr::zero(), Fr::zero());
             // Return E
-            composer
-                .add_gate(
-                    E12.into(),
-                    aAaB.into(),
-                    Fq::one(),
-                    Fq::one(),
-                    Fq::one(),
-                    Fq::zero(),
-                    Fq::zero(),
-                )
-                .2
+            composer.add(
+                E12,
+                aAaB,
+                Fr::one(),
+                Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
+            )
         };
         // Compute F
-        let F = composer
-            .add_gate(
-                D.into(),
-                C.into(),
-                Fq::one(),
-                -Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            )
-            .2;
+        let F = composer.add(
+            D.into(),
+            C.into(),
+            -Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
 
         // Compute G
-        let G = composer
-            .add_gate(
-                D.into(),
-                C.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            )
-            .2;
+        let G = composer.add(
+            D.into(),
+            C.into(),
+            Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
 
         // Compute H
-        let H = composer
-            .add_gate(
-                A.into(),
-                B.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
-            )
-            .2;
+        let H = composer.add(
+            A.into(),
+            B.into(),
+            Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
         // Compute new point coords
-        let (E, F, new_x) = composer.mul_gate(
-            E.into(),
-            F.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (G, H, new_y) = composer.mul_gate(
+        let new_x = composer.mul(E, F, Fr::one(), Fr::one(), Fr::zero(), Fr::zero());
+        let new_y = composer.mul(
             G.into(),
             H.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
-        let (_, _, new_z) = composer.mul_gate(
+        let new_z = composer.mul(
             F.into(),
             G.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
-        let (_, _, new_t) = composer.mul_gate(
+        let new_t = composer.mul(
             E.into(),
             H.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
 
         JubJubPointGadget {
@@ -238,11 +177,11 @@ impl JubJubPointGadget<Fq> {
 
     // Builds and adds to the CS the circuit that corresponds to the
     /// doubling of a Twisted Edwards point in Extended Coordinates.
-    pub fn double(&self, composer: &mut Bls12_381Composer) -> JubJubPointGadget<Fq> {
+    pub fn double(&self, composer: &mut Bls12_381Composer) -> JubJubPointGadget {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
-        let a = composer.add_input(JubJubParameters::COEFF_A);
-        let d = composer.add_input(JubJubParameters::COEFF_D);
+        let coeff_a = JubJubParameters::COEFF_A;
+        let coeff_d = JubJubParameters::COEFF_D;
 
         // Point doubling impl
         // A = p1_x²
@@ -256,144 +195,98 @@ impl JubJubPointGadget<Fq> {
         // X3 = E * F,  Y3 = G * H, Z3 = F * G, T3 = E * H
 
         // Compute A
-        let (X, _, A) = composer.mul_gate(
-            self.X.clone().into(),
-            self.X.clone().into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let A = composer.mul(
+            self.X,
+            self.X,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute B
-        let (Y, _, B) = composer.mul_gate(
-            self.Y.clone().into(),
-            self.Y.clone().into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let B = composer.mul(
+            self.Y,
+            self.Y,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute C
-        let (_, C, Z) = composer.mul_gate(
-            self.Z.clone().into(),
-            self.Z.clone().into(),
-            Fq::from(2u8),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let C = composer.mul(
+            self.Z,
+            self.Z,
+            Fr::one(),
+            -Fr::from(2u8),
+            Fr::zero(),
+            Fr::zero(),
         );
-        // Compute D
-        let (_, _, D) = composer.mul_gate(
-            a.into(),
-            A.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        // D comp is skipped and scaled when used.
         // Compute E
         let E = {
-            let (_, _, p1_x_y) = composer.add_gate(
-                X.into(),
-                Y.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
+            let p1_x_y = composer.add(
+                self.X,
+                self.Y,
+                Fr::one(),
+                Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
             );
-            let (_, _, p1_x_y_sq) = composer.mul_gate(
-                p1_x_y.into(),
-                p1_x_y.into(),
-                Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
+            let p1_x_y_sq = composer.mul(
+                p1_x_y,
+                p1_x_y,
+                Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
             );
-            let (_, _, min_a_min_b) = composer.add_gate(
-                A.into(),
-                B.into(),
-                -Fq::one(),
-                -Fq::one(),
-                Fq::one(),
-                Fq::zero(),
-                Fq::zero(),
+            let min_a_min_b = composer.add(
+                A,
+                B,
+                -Fr::one(),
+                -Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
             );
-            composer
-                .add_gate(
-                    p1_x_y_sq.into(),
-                    min_a_min_b.into(),
-                    Fq::one(),
-                    -Fq::one(),
-                    Fq::one(),
-                    Fq::zero(),
-                    Fq::zero(),
-                )
-                .2
+            composer.add(
+                p1_x_y_sq,
+                min_a_min_b,
+                Fr::one(),
+                -Fr::one(),
+                -Fr::one(),
+                Fr::zero(),
+                Fr::zero(),
+            )
         };
         // Compute G
-        let (_, _, G) = composer.add_gate(
-            D.into(),
-            B.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let G = composer.add(A, B, coeff_a, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
         // Compute F
-        let (_, _, F) = composer.add_gate(
-            G.into(),
-            C.into(),
-            Fq::one(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let F = composer.add(
+            G,
+            C,
+            Fr::one(),
+            -Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute H
-        let (_, _, H) = composer.add_gate(
-            D.into(),
-            B.into(),
-            Fq::one(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let H = composer.add(
+            A,
+            B,
+            coeff_a,
+            -Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute point coordinates
-        let (_, _, new_x) = composer.mul_gate(
-            E.into(),
-            F.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, new_y) = composer.mul_gate(
-            G.into(),
-            H.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, new_z) = composer.mul_gate(
-            F.into(),
-            G.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, new_t) = composer.mul_gate(
-            E.into(),
-            H.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let new_x = composer.mul(E, F, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_y = composer.mul(G, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_z = composer.mul(F, G, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_t = composer.mul(E, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
 
         JubJubPointGadget {
             X: new_x.into(),
@@ -404,176 +297,146 @@ impl JubJubPointGadget<Fq> {
     }
     /// Checks the equalty between two JubJub points in TwEdws Extended Coords according
     /// to the eq: `self.x * other.z = other.x * self.z AND self.y * other.z == other.y * self.z`
-    pub fn equal(&self, composer: &mut Bls12_381Composer, other: &JubJubPointGadget<Fq>) {
-        let (_, other_z, a) = composer.mul_gate(
-            self.X.clone(),
-            other.Z.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+    pub fn equal(&self, composer: &mut Bls12_381Composer, other: &JubJubPointGadget) {
+        // First assigment
+        let a = composer.mul(
+            self.X,
+            other.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
-        let (_, Z, b) = composer.mul_gate(
-            other.X.clone(),
-            self.Z.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        // Constraint a - b == 0
-        let _ = composer.add_gate(
-            a.into(),
-            b.into(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, c) = composer.mul_gate(
-            self.Y.clone(),
-            other_z.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        let (_, _, d) = composer.mul_gate(
-            other.Y.clone(),
-            Z.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let b = composer.mul(
+            other.X,
+            self.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Constraint a - b == 0
-        let _ = composer.add_gate(
+        let a_min_b = composer.add(
             a.into(),
             b.into(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            -Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
+        composer.constrain_to_constant(a_min_b, Fr::zero(), Fr::zero());
+        // Second assigment
+        let c = composer.mul(
+            self.Y,
+            other.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
+        let d = composer.mul(
+            other.Y,
+            self.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
+        // Constraint c - d == 0
+        let c_min_d = composer.add(
+            c,
+            d,
+            Fr::one(),
+            -Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
+        );
+        composer.constrain_to_constant(c_min_d, Fr::zero(), Fr::zero());
     }
     /// Adds constraints to ensure that the point satisfies the JubJub curve eq
     /// by verifying `(aX^{2}+Y^{2})Z^{2} = Z^{4}+d(X^{2})Y^{2}`
     pub fn satisfy_curve_eq(&self, composer: &mut Bls12_381Composer) {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
-        let a = composer.add_input(JubJubParameters::COEFF_A);
-        let d = composer.add_input(JubJubParameters::COEFF_D);
-
-        // Compute X²
-        let (_, _, x_sq) = composer.mul_gate(
-            self.X.clone(),
-            self.X.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let coeff_a = JubJubParameters::COEFF_A;
+        let coeff_d = JubJubParameters::COEFF_D;
 
         // Compute a * X²
-        let (_, _, a_x_sq) = composer.mul_gate(
-            x_sq.into(),
-            a.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let a_x_sq = composer.mul(self.X, self.X, Fr::one(), -coeff_a, Fr::zero(), Fr::zero());
         // Compute Y²
-        let (_, _, y_sq) = composer.mul_gate(
-            self.Y.clone(),
-            self.Y.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let y_sq = composer.mul(
+            self.Y,
+            self.Y,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute a*X² + Y²
-        let (_, _, a_xsq_ysq) = composer.add_gate(
-            a_x_sq.into(),
-            y_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let a_xsq_ysq = composer.add(
+            a_x_sq,
+            y_sq,
+            Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute Z²
-        let (_, _, z_sq) = composer.mul_gate(
-            self.Z.clone(),
-            self.Z.clone(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let z_sq = composer.mul(
+            self.Z,
+            self.Z,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute left assigment
-        let (_, _, left_assig) = composer.mul_gate(
+        let left_assig = composer.mul(
             a_xsq_ysq.into(),
             z_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
 
         // Compute Z⁴
-        let (_, _, z_sq_sq) = composer.mul_gate(
-            z_sq.into(),
-            z_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        // Compute d(X²)
-        let (_, _, d_x_sq) = composer.mul_gate(
-            d.into(),
-            x_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+        let z_sq_sq = composer.mul(z_sq, z_sq, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        // Compute X²
+        let x_sq = composer.mul(
+            self.X,
+            self.X,
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
         // Compute d*(X²) * Y²
-        let (_, _, d_x_sq_y_sq) = composer.mul_gate(
-            d_x_sq.into(),
-            y_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
+        let d_x_sq_y_sq = composer.mul(x_sq, y_sq, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
         // Compute right assigment
-        let (_, _, right_assig) = composer.add_gate(
+        let right_assig = composer.add(
             z_sq_sq.into(),
             d_x_sq_y_sq.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
-        // Create Variable 0
-        let var_zero = composer.add_input(Fq::zero());
         // Constrain right_assig = left_assig
-        composer.poly_gate(
+        let should_be_zero = composer.add(
             left_assig.into(),
             right_assig.into(),
-            var_zero.into(),
-            Fq::zero(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
+            -Fr::one(),
+            Fr::one(),
+            -Fr::one(),
+            Fr::zero(),
+            Fr::zero(),
         );
+        composer.constrain_to_constant(should_be_zero, Fr::zero(), Fr::zero());
     }
 
     /// Gets an Scalar represented as a BoolVar array in Big Endian
@@ -582,9 +445,9 @@ impl JubJubPointGadget<Fq> {
         &self,
         composer: &mut StandardComposer<Bls12_381>,
         scalar: &[BoolVar],
-    ) -> JubJubPointGadget<Fq> {
-        let zero = composer.add_input(Fq::zero());
-        let one = composer.add_input(Fq::one());
+    ) -> JubJubPointGadget {
+        let zero = composer.add_input(Fr::zero());
+        let one = composer.add_input(Fr::one());
 
         let mut Q = JubJubPointGadget {
             X: zero.into(),
@@ -611,27 +474,27 @@ impl JubJubPointGadget<Fq> {
         composer: &mut Bls12_381Composer,
         selector: BoolVar,
     ) -> Self {
-        let one = composer.add_input(Fq::one());
+        let one = composer.add_input(Fr::one());
 
         // x' = x if bit = 1
         // x' = 0 if bit = 0 =>
         // x' = x * bit
-        let x_prime = conditionally_select_zero(composer, self.X.clone(), selector.into());
+        let x_prime = conditionally_select_zero(composer, self.X, selector.into());
 
         // y' = y if bit = 1
         // y' = 1 if bit = 0 =>
         // y' = bit * y + (1 - bit)
-        let y_prime = conditionally_select_one(composer, self.X.clone(), selector.into());
+        let y_prime = conditionally_select_one(composer, self.X, selector.into());
 
         // z' = z if bit = 1
         // z' = 1 if bit = 0 =>
         // z' = bit * z + (1 - bit)
-        let z_prime = conditionally_select_one(composer, self.X.clone(), selector.into());
+        let z_prime = conditionally_select_one(composer, self.X, selector.into());
 
         // t' = t if bit = 1
         // t' = 0 if bit = 0 =>
         // t' = t * bit
-        let t_prime = conditionally_select_zero(composer, self.X.clone(), selector.into());
+        let t_prime = conditionally_select_zero(composer, self.X, selector.into());
 
         JubJubPointGadget {
             X: x_prime.into(),
@@ -651,97 +514,8 @@ mod tests {
     use plonk::srs;
     use poly_commit::kzg10::UniversalParams;
     use poly_commit::kzg10::{Powers, VerifierKey};
+
     fn gen_transcript() -> Transcript {
         Transcript::new(b"jubjub_ecc_ops")
-    }
-
-    fn prove(
-        composer: &mut Bls12_381Composer,
-    ) -> (
-        Proof<Bls12_381>,
-        UniversalParams<Bls12_381>,
-        Powers<Bls12_381>,
-        Vec<Fq>,
-    ) {
-        composer.add_dummy_constraints();
-        composer.add_dummy_constraints();
-        composer.add_dummy_constraints();
-
-        let mut transcript = gen_transcript();
-        let public_params = srs::setup(2 * composer.circuit_size().next_power_of_two());
-        let (ck, vk) = srs::trim(
-            &public_params,
-            2 * composer.circuit_size().next_power_of_two(),
-        )
-        .unwrap();
-        let eval_domain = EvaluationDomain::<Fq>::new(composer.circuit_size()).unwrap();
-
-        let prep_circ = composer.preprocess(&ck, &mut transcript, &eval_domain);
-        let proof = composer.prove(&ck, &prep_circ, &mut transcript);
-        unimplemented!()
-        /*(
-            proof,
-            public_params.clone(),
-            ck,
-            composer.public_inputs().to_owned(),
-        )*/
-    }
-
-    fn verify(
-        composer: &mut Bls12_381Composer,
-        public_params: UniversalParams<Bls12_381>,
-        proof: Proof<Bls12_381>,
-        pub_inputs: &Vec<Fq>,
-    ) -> bool {
-        composer.add_dummy_constraints();
-        composer.add_dummy_constraints();
-        composer.add_dummy_constraints();
-
-        let mut transcript = gen_transcript();
-        let public_params = srs::setup(2 * composer.circuit_size().next_power_of_two());
-        let (ck, vk) = srs::trim(
-            &public_params,
-            2 * composer.circuit_size().next_power_of_two(),
-        )
-        .unwrap();
-        let eval_domain = EvaluationDomain::<Fq>::new(composer.circuit_size()).unwrap();
-        let prep_circ = composer.preprocess(&ck, &mut transcript, &eval_domain);
-        proof.verify(&prep_circ, &mut transcript, &vk, pub_inputs)
-    }
-
-    #[test]
-    #[ignore]
-    fn dummy_test() {
-        let mut composer = StandardComposer::<Bls12_381>::new();
-        let one = composer.add_input(Fq::one());
-        composer.add_gate(
-            one.into(),
-            one.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        composer.add_dummy_constraints();
-        let (proof, public_params, ck, public_inputs) = prove(&mut composer);
-        let mut verif_composer = StandardComposer::<Bls12_381>::new();
-        let one = verif_composer.add_input(Fq::one());
-        verif_composer.add_gate(
-            one.into(),
-            one.into(),
-            Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        );
-        verif_composer.add_dummy_constraints();
-        assert!(verify(
-            &mut verif_composer,
-            public_params,
-            proof,
-            &public_inputs
-        ));
     }
 }
