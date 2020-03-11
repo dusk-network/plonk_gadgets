@@ -1,9 +1,10 @@
 use crate::gadgets::boolean::BoolVar;
 use algebra::curves::bls12_381::Bls12_381;
-use algebra::fields::{jubjub::fq::Fq, PrimeField};
+use algebra::fields::bls12_381::fr::Fr;
+use algebra::fields::PrimeField;
 use num_traits::{One, Zero};
 use plonk::cs::composer::StandardComposer;
-use plonk::cs::constraint_system::{LinearCombination as LC, Variable};
+use plonk::cs::constraint_system::Variable;
 use rand::RngCore;
 
 /// Conditionally selects the value provided or a zero instead.
@@ -14,12 +15,10 @@ use rand::RngCore;
 /// x' = 0 if select = 0
 pub fn conditionally_select_zero(
     composer: &mut StandardComposer<Bls12_381>,
-    x: LC<Fq>,
-    select: LC<Fq>,
+    x: Variable,
+    select: Variable,
 ) -> Variable {
-    composer
-        .mul_gate(x, select, Fq::one(), Fq::one(), Fq::zero(), Fq::zero())
-        .2
+    composer.mul(x, select, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero())
 }
 
 /// Conditionally selects the value provided or a one instead.
@@ -31,95 +30,205 @@ pub fn conditionally_select_zero(
 /// y' = bit * y + (1 - bit)
 pub fn conditionally_select_one(
     composer: &mut StandardComposer<Bls12_381>,
-    x: LC<Fq>,
+    x: Variable,
     select: BoolVar,
 ) -> Variable {
-    let one = composer.add_input(Fq::one());
-    let (select, _, bit_t_x) = composer.mul_gate(
+    let one = composer.add_input(Fr::one());
+
+    let bit_t_x = composer.mul(
         x,
         select.into(),
-        Fq::one(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
+        Fr::one(),
+        Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
     );
-    // XXX: We can expres the triple addition as a LC and then constrain, but two gates is more readable ATM
-    let (_, _, bit_ty_one) = composer.add_gate(
+    let bit_ty_one = composer.add(
         bit_t_x.into(),
         one.into(),
-        Fq::one(),
-        Fq::one(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
+        Fr::one(),
+        Fr::one(),
+        Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
     );
-    composer
-        .add_gate(
-            bit_ty_one.into(),
-            select.into(),
-            -Fq::one(),
-            Fq::one(),
-            Fq::one(),
-            Fq::zero(),
-            Fq::zero(),
-        )
-        .2
+    composer.add(
+        bit_ty_one,
+        select.into(),
+        -Fr::one(),
+        Fr::one(),
+        Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
+    )
 }
 
 /// Adds constraints to the CS which check that a Variable != 0
 pub fn is_non_zero(
     composer: &mut StandardComposer<Bls12_381>,
-    var: LC<Fq>,
-    var_assigment: Option<Fq>,
+    var: Variable,
+    var_assigment: Option<Fr>,
 ) {
-    let one = composer.add_input(Fq::one());
+    let one = composer.add_input(Fr::one());
     // XXX: We use this Fq random obtention but we will use the random variable generator
     // that we will include in the PLONK API on the future.
     let inv = var_assigment.unwrap_or_else(|| {
-        Fq::from_random_bytes(&rand::thread_rng().next_u64().to_le_bytes()).unwrap()
+        Fr::from_random_bytes(&rand::thread_rng().next_u64().to_le_bytes()).unwrap()
     });
     let inv_var = composer.add_input(inv);
     // Var * Inv(Var) = 1
     composer.poly_gate(
         var,
-        inv_var.into(),
-        one.into(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
+        inv_var,
+        one,
+        Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
+        Fr::one(),
+        Fr::zero(),
+        Fr::zero(),
     );
 }
 
 /// Constraints a `LinearCombination` to be equal to zero or one with:
 /// `(1 - a) * a = 0` returning a `BoolVar` that preserves
 /// the original Variable value.
-pub fn binary_constrain(composer: &mut StandardComposer<Bls12_381>, bit: LC<Fq>) -> BoolVar {
-    let one = composer.add_input(Fq::one());
-    let zero = composer.add_input(Fq::zero());
-    // 1 - bit
-    let (_, bit, one_min_bit) = composer.add_gate(
-        one.into(),
-        bit.clone(),
-        Fq::one(),
-        -Fq::one(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
-    );
-    // (1 - bit) * bit == 0
-    composer.poly_gate(
-        one_min_bit.into(),
-        bit.into(),
-        zero.into(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
-        Fq::one(),
-        Fq::zero(),
-        Fq::zero(),
-    );
+pub fn binary_constrain(composer: &mut StandardComposer<Bls12_381>, bit: Variable) -> BoolVar {
+    composer.bool_gate(bit);
     BoolVar(bit)
+}
+
+mod tests {
+    use super::*;
+    use ff_fft::EvaluationDomain;
+    use merlin::Transcript;
+    use plonk::cs::proof::Proof;
+    use plonk::cs::Composer;
+    use plonk::srs::*;
+    use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
+    use std::str::FromStr;
+
+    fn gen_transcript() -> Transcript {
+        Transcript::new(b"TESTING")
+    }
+
+    fn prove_binary(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        possible_bit: Fr,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let possible_bit = composer.add_input(possible_bit);
+        binary_constrain(&mut composer, possible_bit.into());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_binary(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let possible_bit = composer.add_input(Fr::from_str("56").unwrap());
+        binary_constrain(&mut composer, possible_bit.into());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fr::zero(), Fr::zero(), Fr::zero()],
+        )
+    }
+
+    fn binary_roundtrip_helper(possible_bit: Fr) -> bool {
+        let public_parameters = setup(8, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 8).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(8).unwrap();
+
+        let proof = prove_binary(&domain, &ck, possible_bit);
+        verify_binary(&domain, &ck, &vk, &proof)
+    }
+
+    #[test]
+    fn binary_constraint_test() {
+        assert!(binary_roundtrip_helper(Fr::zero()));
+        assert!(binary_roundtrip_helper(Fr::one()));
+        assert!(!binary_roundtrip_helper(Fr::one() + Fr::one()));
+    }
+
+    fn prove_cond_select_zero(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        num: Fr,
+        select: Fr,
+        expected: Fr,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(num);
+        let select = composer.add_input(select);
+        let select = binary_constrain(&mut composer, select.into());
+        let selected = conditionally_select_zero(&mut composer, num.into(), select.into());
+        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_cond_select_zero(
+        domain: &EvaluationDomain<Fr>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        expected: Fr,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let num = composer.add_input(Fr::from_str("46").unwrap());
+        let select = composer.add_input(Fr::from_str("36").unwrap());
+        let select = binary_constrain(&mut composer, select.into());
+        let selected = conditionally_select_zero(&mut composer, num.into(), select.into());
+        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fr::zero()],
+        )
+    }
+
+    fn cond_select_zero_roundtrip_helper(num: Fr, selector: Fr, expected: Fr) -> bool {
+        let public_parameters = setup(16, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+
+        let proof = prove_cond_select_zero(&domain, &ck, num, selector, expected);
+        verify_cond_select_zero(&domain, &ck, &vk, &proof, expected)
+    }
+
+    #[test]
+    fn test_conditionally_select_zero() {
+        let one = Fr::one();
+        let two = one + one;
+        let zero = Fr::zero();
+
+        assert!(cond_select_zero_roundtrip_helper(two, one, two));
+        assert!(cond_select_zero_roundtrip_helper(two, zero, zero));
+    }
 }
