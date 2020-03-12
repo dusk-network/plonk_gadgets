@@ -342,7 +342,7 @@ impl JubJubPointGadget {
         let coeff_d = JubJubParameters::COEFF_D;
 
         // Compute a * X²
-        let a_x_sq = composer.mul(self.X, self.X, Fr::one(), -coeff_a, Fr::zero(), Fr::zero());
+        let a_x_sq = composer.mul(self.X, self.X, coeff_a, -Fr::one(), Fr::zero(), Fr::zero());
         // Compute Y²
         let y_sq = composer.mul(
             self.Y,
@@ -373,8 +373,8 @@ impl JubJubPointGadget {
         );
         // Compute left assigment
         let left_assig = composer.mul(
-            a_xsq_ysq.into(),
-            z_sq.into(),
+            a_xsq_ysq,
+            z_sq,
             Fr::one(),
             -Fr::one(),
             Fr::zero(),
@@ -383,17 +383,10 @@ impl JubJubPointGadget {
 
         // Compute Z⁴
         let z_sq_sq = composer.mul(z_sq, z_sq, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        // Compute X²
-        let x_sq = composer.mul(
-            self.X,
-            self.X,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
-        );
+        // Compute d * X²
+        let d_x_sq = composer.mul(self.X, self.X, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
         // Compute d*(X²) * Y²
-        let d_x_sq_y_sq = composer.mul(x_sq, y_sq, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
+        let d_x_sq_y_sq = composer.mul(d_x_sq, y_sq, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
         // Compute right assigment
         let right_assig = composer.add(
             z_sq_sq.into(),
@@ -816,5 +809,66 @@ mod tests {
         assert!(point_doubling_roundtrip_helper(&P1, &P2));
         assert!(point_doubling_roundtrip_helper(&id_p, &id_p));
         assert!(!point_doubling_roundtrip_helper(&P1, &P_err));
+    }
+
+    fn prove_curve_eq_satisfy(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Gen Point gadgets
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Constrain the point to satisfy curve eq
+        P1_g.satisfy_curve_eq(&mut composer);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_curve_eq_satisfy(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Gen Point gadgets
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Constrain the point to satisfy curve eq
+        P1_g.satisfy_curve_eq(&mut composer);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn curve_eq_satisfy_roundtrip_helper(P1: &JubJubProjective) -> bool {
+        let public_parameters = setup(16384, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+
+        let proof = prove_curve_eq_satisfy(&domain, &ck, P1);
+        verify_curve_eq_satisfy(&domain, &ck, &vk, &proof, P1)
+    }
+
+    #[test]
+    fn test_curve_eq_satisfy() {
+        let (id_p, P1, _, _, _) = testing_points();
+        let incorrect_point = JubJubProjective::new(Fq::one(), Fq::one(), Fq::one(), Fq::one());
+        assert!(curve_eq_satisfy_roundtrip_helper(&P1));
+        assert!(curve_eq_satisfy_roundtrip_helper(&id_p));
+        assert!(!curve_eq_satisfy_roundtrip_helper(&incorrect_point));
     }
 }
