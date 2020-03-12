@@ -112,8 +112,8 @@ impl JubJubPointGadget {
         let F = composer.add(
             D.into(),
             C.into(),
-            -Fr::one(),
             Fr::one(),
+            -Fr::one(),
             -Fr::one(),
             Fr::zero(),
             Fr::zero(),
@@ -141,37 +141,16 @@ impl JubJubPointGadget {
             Fr::zero(),
         );
         // Compute new point coords
-        let new_x = composer.mul(E, F, Fr::one(), Fr::one(), Fr::zero(), Fr::zero());
-        let new_y = composer.mul(
-            G.into(),
-            H.into(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
-        );
-        let new_z = composer.mul(
-            F.into(),
-            G.into(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
-        );
-        let new_t = composer.mul(
-            E.into(),
-            H.into(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
-        );
+        let new_x = composer.mul(E, F, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_y = composer.mul(G, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_z = composer.mul(F, G, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_t = composer.mul(E, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
 
         JubJubPointGadget {
-            X: new_x.into(),
-            Y: new_y.into(),
-            Z: new_z.into(),
-            T: new_t.into(),
+            X: new_x,
+            Y: new_y,
+            Z: new_z,
+            T: new_t,
         }
     }
 
@@ -474,8 +453,6 @@ impl JubJubPointGadget {
         composer: &mut Bls12_381Composer,
         selector: BoolVar,
     ) -> Self {
-        let one = composer.add_input(Fr::one());
-
         // x' = x if bit = 1
         // x' = 0 if bit = 0 =>
         // x' = x * bit
@@ -484,29 +461,30 @@ impl JubJubPointGadget {
         // y' = y if bit = 1
         // y' = 1 if bit = 0 =>
         // y' = bit * y + (1 - bit)
-        let y_prime = conditionally_select_one(composer, self.X, selector.into());
+        let y_prime = conditionally_select_one(composer, self.Y, selector.into());
 
         // z' = z if bit = 1
         // z' = 1 if bit = 0 =>
         // z' = bit * z + (1 - bit)
-        let z_prime = conditionally_select_one(composer, self.X, selector.into());
+        let z_prime = conditionally_select_one(composer, self.Z, selector.into());
 
         // t' = t if bit = 1
         // t' = 0 if bit = 0 =>
         // t' = t * bit
-        let t_prime = conditionally_select_zero(composer, self.X, selector.into());
+        let t_prime = conditionally_select_zero(composer, self.T, selector.into());
 
         JubJubPointGadget {
-            X: x_prime.into(),
-            Y: y_prime.into(),
-            Z: z_prime.into(),
-            T: t_prime.into(),
+            X: x_prime,
+            Y: y_prime,
+            Z: z_prime,
+            T: t_prime,
         }
     }
 }
 
 mod tests {
     use super::*;
+    use crate::gadgets::scalar::*;
     use algebra::curves::jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
     use algebra::fields::jubjub::{fq::Fq, fr::Fr};
     use ff_fft::EvaluationDomain;
@@ -529,14 +507,14 @@ mod tests {
         JubJubProjective,
     ) {
         let (x, y) = JubJubParameters::AFFINE_GENERATOR_COEFFS;
-        let identity = JubJubAffine::default();
+        let identity = JubJubProjective::zero();
         let gen = JubJubAffine::new(x, y);
         let two_gen = gen.mul(Fr::from(2u8));
         let gen_p_two_gen = two_gen.add(gen);
         let x_times_gen = gen.mul(Fr::from(127u8));
 
         (
-            JubJubProjective::from(identity),
+            identity,
             JubJubProjective::from(gen),
             JubJubProjective::from(two_gen),
             JubJubProjective::from(gen_p_two_gen),
@@ -548,13 +526,16 @@ mod tests {
         domain: &EvaluationDomain<Fq>,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
+        P2: &JubJubProjective,
     ) -> Proof<Bls12_381> {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Import point
         let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Import point
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
         // Constrain equalty between P1 instances
-        P1_g.equal(&mut composer, &P1_g);
+        P1_g.equal(&mut composer, &P2_g);
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -568,13 +549,16 @@ mod tests {
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
         P1: &JubJubProjective,
+        P2: &JubJubProjective,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Import point
         let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Import point
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
         // Constrain equalty between P1 instances
-        P1_g.equal(&mut composer, &P1_g);
+        P1_g.equal(&mut composer, &P2_g);
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -592,13 +576,175 @@ mod tests {
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
         let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
 
-        let proof = prove_point_equalty(&domain, &ck, P1);
-        verify_point_equalty(&domain, &ck, &vk, &proof, P2)
+        let proof = prove_point_equalty(&domain, &ck, P1, P2);
+        verify_point_equalty(&domain, &ck, &vk, &proof, P1, P2)
     }
 
     #[test]
     fn test_point_equalty() {
-        let (_, P1, P2, _, _) = testing_points();
-        assert!(point_equalty_roundtrip_helper(&P1, &P2));
+        let (id, P1, P2, _, _) = testing_points();
+        let two = Fq::one() + Fq::one();
+        let zero = Fq::zero();
+        let id_2 = JubJubProjective::new(zero, two, zero, two);
+        assert!(!point_equalty_roundtrip_helper(&P1, &P2));
+        assert!(point_equalty_roundtrip_helper(&P1, &P1));
+        assert!(point_equalty_roundtrip_helper(&id, &id_2));
+    }
+
+    fn prove_conditionally_select_identity(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        selector: &Fq,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let selector = composer.add_input(*selector);
+        let selector = binary_constrain(&mut composer, selector);
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
+        // Conditionally select the identity point
+        P1_g.conditionally_select_identity(&mut composer, selector);
+        // Constraint the point to be equal to the identity
+        P1_g.equal(&mut composer, &P2_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_conditionally_select_identity(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        selector: &Fq,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        let selector = composer.add_input(*selector);
+        let selector = binary_constrain(&mut composer, selector);
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
+        // Conditionally select the identity point
+        P1_g.conditionally_select_identity(&mut composer, selector);
+        // Constraint the point to be equal to the identity
+        P1_g.equal(&mut composer, &P2_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn conditionally_select_identity_roundtrip_helper(
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        selector: &Fq,
+    ) -> bool {
+        let public_parameters = setup(512, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 512).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(512).unwrap();
+
+        let proof = prove_conditionally_select_identity(&domain, &ck, P1, P2, selector);
+        verify_conditionally_select_identity(&domain, &ck, &vk, &proof, P1, P2, selector)
+    }
+
+    #[ignore]
+    #[test]
+    fn test_conditionally_select_identity() {
+        let (id_p, P1, _, _, _) = testing_points();
+        let one = Fq::one();
+        let zero = Fq::zero();
+        let id_p = JubJubProjective::new(zero, one, zero, one);
+        assert!(conditionally_select_identity_roundtrip_helper(
+            &P1, &id_p, &zero
+        ));
+        assert!(conditionally_select_identity_roundtrip_helper(
+            &P1, &P1, &one
+        ));
+    }
+
+    fn prove_point_addition(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        P_res: &JubJubProjective,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import both points
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
+        let P3_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Perform the addition
+        let expected_res = P1_g.add(&mut composer, &P2_g);
+        // Constrain equalty with real result
+        expected_res.equal(&mut composer, &P3_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_point_addition(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        P_res: &JubJubProjective,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import both points
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P2_g = JubJubPointGadget::from_point(&mut composer, P2);
+        let P3_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Perform the addition
+        let expected_res = P1_g.add(&mut composer, &P2_g);
+        // Constrain equalty with real result
+        expected_res.equal(&mut composer, &P3_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn point_addition_roundtrip_helper(
+        P1: &JubJubProjective,
+        P2: &JubJubProjective,
+        P_res: &JubJubProjective,
+    ) -> bool {
+        let public_parameters = setup(16384, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+
+        let proof = prove_point_addition(&domain, &ck, P1, P2, P_res);
+        verify_point_addition(&domain, &ck, &vk, &proof, P1, P2, P_res)
+    }
+
+    #[test]
+    fn test_point_addition() {
+        let (_, P1, P2, P3, _) = testing_points();
+        assert!(point_addition_roundtrip_helper(&P1, &P1, &P2));
     }
 }
