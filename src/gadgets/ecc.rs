@@ -160,7 +160,6 @@ impl JubJubPointGadget {
         // Add a & d curve params to the circuit or get the reference if
         // they've been already committed
         let coeff_a = JubJubParameters::COEFF_A;
-        let coeff_d = JubJubParameters::COEFF_D;
 
         // Point doubling impl
         // A = p1_x²
@@ -195,8 +194,8 @@ impl JubJubPointGadget {
         let C = composer.mul(
             self.Z,
             self.Z,
-            Fr::one(),
-            -Fr::from(2u8),
+            Fr::from(2u8),
+            -Fr::one(),
             Fr::zero(),
             Fr::zero(),
         );
@@ -233,7 +232,7 @@ impl JubJubPointGadget {
                 p1_x_y_sq,
                 min_a_min_b,
                 Fr::one(),
-                -Fr::one(),
+                Fr::one(),
                 -Fr::one(),
                 Fr::zero(),
                 Fr::zero(),
@@ -744,7 +743,78 @@ mod tests {
 
     #[test]
     fn test_point_addition() {
-        let (_, P1, P2, P3, _) = testing_points();
+        let (id_p, P1, P2, P3, _) = testing_points();
         assert!(point_addition_roundtrip_helper(&P1, &P1, &P2));
+        assert!(point_addition_roundtrip_helper(&P1, &P2, &P3));
+        assert!(!point_addition_roundtrip_helper(&P1, &P1, &P3));
+        assert!(point_addition_roundtrip_helper(&P1, &id_p, &P1));
+    }
+
+    fn prove_point_doubling(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+        P_res: &JubJubProjective,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import both points
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P3_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Perform the doubling
+        let expected_res = P1_g.double(&mut composer);
+        // Constrain equalty with real result
+        expected_res.equal(&mut composer, &P3_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_point_doubling(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+        P_res: &JubJubProjective,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import both points
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P3_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Perform the doubling
+        let expected_res = P1_g.double(&mut composer);
+        // Constrain equalty with real result
+        expected_res.equal(&mut composer, &P3_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn point_doubling_roundtrip_helper(P1: &JubJubProjective, P_res: &JubJubProjective) -> bool {
+        let public_parameters = setup(16384, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+
+        let proof = prove_point_doubling(&domain, &ck, P1, P_res);
+        verify_point_doubling(&domain, &ck, &vk, &proof, P1, P_res)
+    }
+
+    #[test]
+    fn test_point_doubling() {
+        let (id_p, P1, P2, P_err, _) = testing_points();
+        assert!(point_doubling_roundtrip_helper(&P1, &P2));
+        assert!(point_doubling_roundtrip_helper(&id_p, &id_p));
+        assert!(!point_doubling_roundtrip_helper(&P1, &P_err));
     }
 }
