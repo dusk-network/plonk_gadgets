@@ -507,15 +507,98 @@ impl JubJubPointGadget {
 
 mod tests {
     use super::*;
+    use algebra::curves::jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
+    use algebra::fields::jubjub::{fq::Fq, fr::Fr};
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use plonk::cs::proof::Proof;
-    use plonk::cs::Composer;
-    use plonk::srs;
-    use poly_commit::kzg10::UniversalParams;
-    use poly_commit::kzg10::{Powers, VerifierKey};
+    use plonk::cs::{proof::Proof, Composer};
+    use plonk::srs::*;
+    use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
+    use std::ops::{Add, Mul};
 
     fn gen_transcript() -> Transcript {
         Transcript::new(b"jubjub_ecc_ops")
+    }
+
+    // Provides points for a later usage in testing
+    fn testing_points() -> (
+        JubJubProjective,
+        JubJubProjective,
+        JubJubProjective,
+        JubJubProjective,
+        JubJubProjective,
+    ) {
+        let (x, y) = JubJubParameters::AFFINE_GENERATOR_COEFFS;
+        let identity = JubJubAffine::default();
+        let gen = JubJubAffine::new(x, y);
+        let two_gen = gen.mul(Fr::from(2u8));
+        let gen_p_two_gen = two_gen.add(gen);
+        let x_times_gen = gen.mul(Fr::from(127u8));
+
+        (
+            JubJubProjective::from(identity),
+            JubJubProjective::from(gen),
+            JubJubProjective::from(two_gen),
+            JubJubProjective::from(gen_p_two_gen),
+            JubJubProjective::from(x_times_gen),
+        )
+    }
+
+    fn prove_point_equalty(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import point
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Constrain equalty between P1 instances
+        P1_g.equal(&mut composer, &P1_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_point_equalty(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Import point
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        // Constrain equalty between P1 instances
+        P1_g.equal(&mut composer, &P1_g);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn point_equalty_roundtrip_helper(P1: &JubJubProjective, P2: &JubJubProjective) -> bool {
+        let public_parameters = setup(16384, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+
+        let proof = prove_point_equalty(&domain, &ck, P1);
+        verify_point_equalty(&domain, &ck, &vk, &proof, P2)
+    }
+
+    #[test]
+    fn test_point_equalty() {
+        let (_, P1, P2, _, _) = testing_points();
+        assert!(point_equalty_roundtrip_helper(&P1, &P2));
     }
 }
