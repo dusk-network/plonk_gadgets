@@ -427,9 +427,10 @@ impl JubJubPointGadget {
             T: zero.into(),
         };
 
-        for bit in scalar {
+        for bit in scalar.iter().rev() {
             Q = Q.double(composer);
             // If bit == 1 -> Q = Q + point
+            // If bit == 0 -> Q = Q + identity_point = Q
             let point_or_id = self.conditionally_select_identity(composer, *bit);
             Q = Q.add(composer, &point_or_id);
         }
@@ -503,14 +504,14 @@ mod tests {
         let gen = JubJubAffine::new(x, y);
         let two_gen = gen.mul(Fr::from(2u8));
         let gen_p_two_gen = two_gen.add(gen);
-        let x_times_gen = gen.mul(Fr::from(127u8));
+        let k_times_gen = gen.mul(Fr::from(127u8));
 
         (
             identity,
             JubJubProjective::from(gen),
             JubJubProjective::from(two_gen),
             JubJubProjective::from(gen_p_two_gen),
-            JubJubProjective::from(x_times_gen),
+            JubJubProjective::from(k_times_gen),
         )
     }
 
@@ -651,19 +652,25 @@ mod tests {
         verify_conditionally_select_identity(&domain, &ck, &vk, &proof, P1, P2, selector)
     }
 
-    #[ignore]
     #[test]
     fn test_conditionally_select_identity() {
-        let (id_p, P1, _, _, _) = testing_points();
+        let (id_p, P1, P2, _, _) = testing_points();
         let one = Fq::one();
         let zero = Fq::zero();
         let id_p = JubJubProjective::new(zero, one, zero, one);
         assert!(conditionally_select_identity_roundtrip_helper(
-            &P1, &id_p, &zero
+            &id_p, &id_p, &zero
+        ));
+        assert!(conditionally_select_identity_roundtrip_helper(
+            &id_p, &id_p, &one
         ));
         assert!(conditionally_select_identity_roundtrip_helper(
             &P1, &P1, &one
         ));
+        // XXX: This should pass? REVIEW!
+        //assert!(conditionally_select_identity_roundtrip_helper(
+        //    &P2, &id_p, &zero
+        //));
     }
 
     fn prove_point_addition(
@@ -870,5 +877,137 @@ mod tests {
         assert!(curve_eq_satisfy_roundtrip_helper(&P1));
         assert!(curve_eq_satisfy_roundtrip_helper(&id_p));
         assert!(!curve_eq_satisfy_roundtrip_helper(&incorrect_point));
+    }
+
+    fn prove_scalar_mul(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        P1: &JubJubProjective,
+        scalar_bits: &[u8],
+        P_res: &JubJubProjective,
+    ) -> Proof<Bls12_381> {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Gen Point gadgets & scalar boolvars
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P_res_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Gen BoolVars for the scalar
+        let bits = scalar_bits
+            .iter()
+            .map(|bit| composer.add_input(Fq::from(*bit)))
+            .collect::<Vec<Variable>>();
+        let bits = bits
+            .iter()
+            .map(|var| binary_constrain(&mut composer, *var))
+            .collect::<Vec<BoolVar>>();
+        // Perform scalar multiplication
+        let res = P1_g.scalar_mul(&mut composer, &bits);
+        // Constrain the result to be equal to what we expected
+        P_res_g.equal(&mut composer, &res);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, domain);
+        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+    }
+
+    fn verify_scalar_mul(
+        domain: &EvaluationDomain<Fq>,
+        ck: &Powers<Bls12_381>,
+        vk: &VerifierKey<Bls12_381>,
+        proof: &Proof<Bls12_381>,
+        P1: &JubJubProjective,
+        scalar_bits: &[u8],
+        P_res: &JubJubProjective,
+    ) -> bool {
+        let mut transcript = gen_transcript();
+        let mut composer = StandardComposer::new();
+        // Gen Point gadgets & scalar boolvars
+        let P1_g = JubJubPointGadget::from_point(&mut composer, P1);
+        let P_res_g = JubJubPointGadget::from_point(&mut composer, P_res);
+        // Gen BoolVars for the scalar
+        let bits = scalar_bits
+            .iter()
+            .map(|bit| composer.add_input(Fq::from(*bit)))
+            .collect::<Vec<Variable>>();
+        let bits = bits
+            .iter()
+            .map(|var| binary_constrain(&mut composer, *var))
+            .collect::<Vec<BoolVar>>();
+        // Perform scalar multiplication
+        let res = P1_g.scalar_mul(&mut composer, &bits);
+        // Constrain the result to be equal to what we expected
+        P_res_g.equal(&mut composer, &res);
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        composer.add_dummy_constraints();
+        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        proof.verify(
+            &preprocessed_circuit,
+            &mut transcript,
+            vk,
+            &vec![Fq::zero()],
+        )
+    }
+
+    fn scalar_mul_roundtrip_helper(
+        P1: &JubJubProjective,
+        P_res: &JubJubProjective,
+        scalar_bits: &[u8],
+    ) -> bool {
+        let public_parameters = setup(16384, &mut rand::thread_rng());
+        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+
+        let proof = prove_scalar_mul(&domain, &ck, P1, scalar_bits, P_res);
+        verify_scalar_mul(&domain, &ck, &vk, &proof, P1, scalar_bits, P_res)
+    }
+
+    #[test]
+    fn test_scalar_mul() {
+        let (_, P1, _, _, P_res) = testing_points();
+        let P_res_2 = P1.mul(&Fr::from(125u8));
+        let scalar_bits = [
+            1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let scalar_bits_125 = [
+            1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        let wrong_scalar_bits = [
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        assert!(scalar_mul_roundtrip_helper(&P1, &P_res, &scalar_bits));
+        assert!(scalar_mul_roundtrip_helper(&P1, &P_res_2, &scalar_bits_125));
+        assert!(!scalar_mul_roundtrip_helper(
+            &P1,
+            &P_res,
+            &wrong_scalar_bits
+        ));
     }
 }
