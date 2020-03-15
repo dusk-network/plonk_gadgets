@@ -198,7 +198,7 @@ dependencies = [
 [[package]]
 name = "plonk"
 version = "0.1.0"
-source = "git+https://github.com/dusk-network/plonk?branch=fix_add_mul_bp#ab8e388cd9ff3f8784585e46484437f353123e7f"
+source = "git+https://github.com/dusk-network/plonk?branch=fast_prover_zexe#585d281e8a0bbd03bdc85c8e36718ab135d38a81"
 dependencies = [
  "algebra 0.1.0 (git+https://github.com/scipr-lab/zexe/)",
  "bls12_381 0.1.1 (git+https://github.com/zkcrypto/bls12_381)",
@@ -221,7 +221,7 @@ dependencies = [
  "ff-fft 0.1.0 (git+https://github.com/scipr-lab/zexe/)",
  "merlin 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "plonk 0.1.0 (git+https://github.com/dusk-network/plonk?branch=fix_add_mul_bp)",
+ "plonk 0.1.0 (git+https://github.com/dusk-network/plonk?branch=fast_prover_zexe)",
  "poly-commit 0.1.0 (git+https://github.com/scipr-lab/poly-commit)",
  "rand 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -457,7 +457,7 @@ dependencies = [
 "checksum merlin 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c6feca46f4fa3443a01769d768727f10c10a20fdb65e52dc16a81f0c8269bb78"
 "checksum num-traits 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "c62be47e61d1842b9170f0fdeec8eba98e60e90e5446449a0545e5152acd7096"
 "checksum num_cpus 1.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "46203554f085ff89c235cd12f7075f3233af9b11ed7c9e16dfe2560d03313ce6"
-"checksum plonk 0.1.0 (git+https://github.com/dusk-network/plonk?branch=fix_add_mul_bp)" = "<none>"
+"checksum plonk 0.1.0 (git+https://github.com/dusk-network/plonk?branch=fast_prover_zexe)" = "<none>"
 "checksum poly-commit 0.1.0 (git+https://github.com/scipr-lab/poly-commit)" = "<none>"
 "checksum ppv-lite86 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"
 "checksum proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)" = "cf3d2011ab5c909338f7887f4fc896d35932e29146c12c8d01da6b22a80ba759"
