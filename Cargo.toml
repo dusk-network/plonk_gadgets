@@ -4,8 +4,14 @@ version = "0.1.0"
 authors = ["CPerezz <c.perezbaro@gmail.com>", "Victor Lopez <vhrlopes@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-plonk = {git = "https://github.com/dusk-network/plonk"}
-jubjub = {git = "https://github.com/zkcrypto/jubjub"}
+num-traits = "0.2"
+plonk = { git = "https://github.com/dusk-network/plonk", branch = "fast_prover_zexe" }
+algebra = { git = "https://github.com/scipr-lab/zexe/", features = [ "parallel" ] }
+ff-fft = { git = "https://github.com/scipr-lab/zexe/" }
+poly-commit = { git = "https://github.com/scipr-lab/poly-commit", branch = "master" }
+merlin = "2.0"
+# rand is added until we don't expose a method in plonk that allows the verifier 
+# creating random Variables.
+rand = "0.7.0"
