@@ -1,12 +1,12 @@
 use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::scalar::*;
-use algebra::curves::bls12_381::Bls12_381;
-use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
 use algebra::curves::models::TEModelParameters;
-use algebra::fields::bls12_381::Fr;
-use num_traits::{One, Zero};
+use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
-use dusk_plonk::constraint_system::constraint_system::Variable;
+use dusk_plonk::constraint_system::Variable;
+use jubjub::Fr;
+use jubjub::{JubJubParameters, JubJubProjective};
+use num_traits::{One, Zero};
 
 pub type Bls12_381Composer = StandardComposer;
 /// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
@@ -480,10 +480,10 @@ mod tests {
     use crate::gadgets::scalar::*;
     use algebra::curves::jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
     use algebra::fields::jubjub::{fq::Fq, fr::Fr};
-    use ff_fft::EvaluationDomain;
-    use merlin::Transcript;
     use dusk_plonk::constraint_system::{proof::Proof, Composer};
+    use dusk_plonk::fft::EvaluationDomain;
     use dusk_plonk::srs::*;
+    use merlin::Transcript;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::ops::{Add, Mul};
 
@@ -516,7 +516,7 @@ mod tests {
     }
 
     fn prove_point_equalty(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
@@ -537,7 +537,7 @@ mod tests {
     }
 
     fn verify_point_equalty(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -567,7 +567,7 @@ mod tests {
     fn point_equalty_roundtrip_helper(P1: &JubJubProjective, P2: &JubJubProjective) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_equalty(&domain, &ck, P1, P2);
         verify_point_equalty(&domain, &ck, &vk, &proof, P1, P2)
@@ -585,7 +585,7 @@ mod tests {
     }
 
     fn prove_conditionally_select_identity(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
@@ -609,7 +609,7 @@ mod tests {
     }
 
     fn verify_conditionally_select_identity(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -646,7 +646,7 @@ mod tests {
     ) -> bool {
         let public_parameters = setup(512, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 512).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(512).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(512).unwrap();
 
         let proof = prove_conditionally_select_identity(&domain, &ck, P1, P2, selector);
         verify_conditionally_select_identity(&domain, &ck, &vk, &proof, P1, P2, selector)
@@ -674,7 +674,7 @@ mod tests {
     }
 
     fn prove_point_addition(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
@@ -698,7 +698,7 @@ mod tests {
     }
 
     fn verify_point_addition(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -735,7 +735,7 @@ mod tests {
     ) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_addition(&domain, &ck, P1, P2, P_res);
         verify_point_addition(&domain, &ck, &vk, &proof, P1, P2, P_res)
@@ -751,7 +751,7 @@ mod tests {
     }
 
     fn prove_point_doubling(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
         P_res: &JubJubProjective,
@@ -773,7 +773,7 @@ mod tests {
     }
 
     fn verify_point_doubling(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -804,7 +804,7 @@ mod tests {
     fn point_doubling_roundtrip_helper(P1: &JubJubProjective, P_res: &JubJubProjective) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_doubling(&domain, &ck, P1, P_res);
         verify_point_doubling(&domain, &ck, &vk, &proof, P1, P_res)
@@ -819,7 +819,7 @@ mod tests {
     }
 
     fn prove_curve_eq_satisfy(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
     ) -> Proof<Bls12_381> {
@@ -837,7 +837,7 @@ mod tests {
     }
 
     fn verify_curve_eq_satisfy(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -864,7 +864,7 @@ mod tests {
     fn curve_eq_satisfy_roundtrip_helper(P1: &JubJubProjective) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_curve_eq_satisfy(&domain, &ck, P1);
         verify_curve_eq_satisfy(&domain, &ck, &vk, &proof, P1)
@@ -880,7 +880,7 @@ mod tests {
     }
 
     fn prove_scalar_mul(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         P1: &JubJubProjective,
         scalar_bits: &[u8],
@@ -912,7 +912,7 @@ mod tests {
     }
 
     fn verify_scalar_mul(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -957,7 +957,7 @@ mod tests {
     ) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_scalar_mul(&domain, &ck, P1, scalar_bits, P_res);
         verify_scalar_mul(&domain, &ck, &vk, &proof, P1, scalar_bits, P_res)

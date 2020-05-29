@@ -2,12 +2,11 @@ use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::ecc::*;
 use crate::gadgets::scalar;
 use algebra::fields::PrimeField;
-use algebra::ToBytes;
 use bls12_381::Bls12_381;
 use dusk_plonk::constraint_system::composer::StandardComposer;
 use dusk_plonk::constraint_system::Variable;
 use jubjub::JubJubProjective;
-use jubjub::{fq::Fq, fr::Fr};
+use jubjub::{Fq, Fr};
 use rand::{thread_rng, RngCore};
 
 pub fn sk_knowledge(
@@ -68,11 +67,11 @@ fn scalar_to_bits(scalar: &Fr) -> Vec<u8> {
 
 mod test {
     use super::*;
-    use algebra::curves::jubjub::{JubJubAffine, JubJubParameters};
     use algebra::curves::models::TEModelParameters;
     use dusk_plonk::constraint_system::{proof::Proof, Composer};
+    use dusk_plonk::fft::EvaluationDomain;
     use dusk_plonk::srs::*;
-    use ff_fft::EvaluationDomain;
+    use jubjub::{JubJubAffine, JubJubParameters};
     use merlin::Transcript;
     use num_traits::identities::{One, Zero};
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
@@ -107,7 +106,7 @@ mod test {
     }
 
     fn prove_sk_knowledge(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         basep: &JubJubProjective,
         pk: &JubJubProjective,
@@ -128,7 +127,7 @@ mod test {
     }
 
     fn verify_sk_knowledge(
-        domain: &EvaluationDomain<Fq>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
@@ -162,7 +161,7 @@ mod test {
     ) -> bool {
         let public_parameters = setup(16384, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16384).unwrap();
-        let domain: EvaluationDomain<Fq> = EvaluationDomain::new(16384).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_sk_knowledge(&domain, &ck, basep, pk, scalar);
         verify_sk_knowledge(&domain, &ck, &vk, &proof, basep, pk, None)

@@ -1,9 +1,9 @@
 use crate::gadgets::boolean::BoolVar;
-use algebra::curves::bls12_381::Bls12_381;
-use algebra::fields::bls12_381::fr::Fr;
 use algebra::fields::PrimeField;
+use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
 use dusk_plonk::constraint_system::constraint_system::Variable;
+use jubjub::Fr;
 use num_traits::{One, Zero};
 use rand::RngCore;
 
@@ -33,47 +33,47 @@ pub fn conditionally_select_one(
     y: Variable,
     select: BoolVar,
 ) -> Variable {
-    let one = composer.add_input(Fr::one());
+    let one = composer.add_input(Scalar::one());
     // bit * y
     let bit_y = composer.mul(
         select.into(),
         y,
-        Fr::one(),
-        -Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
+        Scalar::one(),
+        -Scalar::one(),
+        Scalar::zero(),
+        Scalar::zero(),
     );
     // 1 - bit
     let one_min_bit = composer.add(
         one,
         select.into(),
-        Fr::one(),
-        -Fr::one(),
-        -Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
+        Scalar::one(),
+        -Scalar::one(),
+        -Scalar::one(),
+        Scalar::zero(),
+        Scalar::zero(),
     );
     // bit * y + (1 - bit)
     composer.add(
         bit_y,
         one_min_bit,
-        Fr::one(),
-        Fr::one(),
-        -Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
+        Scalar::one(),
+        Scalar::one(),
+        -Scalar::one(),
+        Scalar::zero(),
+        Scalar::zero(),
     )
 }
 
 /// Adds constraints to the CS which check that a Variable != 0
-pub fn is_non_zero(composer: &mut StandardComposer, var: Variable, var_assigment: Option<Fr>) {
-    let one = composer.add_input(Fr::one());
+pub fn is_non_zero(composer: &mut StandardComposer, var: Variable, var_assigment: Option<Scalar>) {
+    let one = composer.add_input(Scalar::one());
     // XXX: We use this Fq random obtention but we will use the random variable generator
     // that we will include in the PLONK API on the future.
     let inv = match var_assigment {
         Some(fr) => fr,
         // XXX: Should be a randomly generated variable
-        None => Fr::from(127u8),
+        None => Scalar::from(127u64),
     };
     let inv_var = composer.add_input(inv);
     // Var * Inv(Var) = 1
@@ -81,12 +81,12 @@ pub fn is_non_zero(composer: &mut StandardComposer, var: Variable, var_assigment
         var,
         inv_var,
         one,
-        Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
-        -Fr::one(),
-        Fr::zero(),
-        Fr::zero(),
+        Scalar::one(),
+        Scalar::zero(),
+        Scalar::zero(),
+        -Scalar::one(),
+        Scalar::zero(),
+        Scalar::zero(),
     );
 }
 
@@ -102,10 +102,10 @@ mod tests {
     use super::*;
     use dusk_plonk::constraint_system::proof::Proof;
     use dusk_plonk::constraint_system::Composer;
+    use dusk_plonk::fft::EvaluationDomain;
     use dusk_plonk::srs::*;
-    use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
+    use poly_commit::kzg10::{Powers, ProverKey, UniversalParams, VerifierKey};
     use std::str::FromStr;
 
     fn gen_transcript() -> Transcript {
@@ -113,9 +113,9 @@ mod tests {
     }
 
     fn prove_binary(
-        domain: &EvaluationDomain<Fr>,
-        ck: &Powers<Bls12_381>,
-        possible_bit: Fr,
+        domain: &EvaluationDomain,
+        ck: &ProverKey,
+        possible_bit: Scalar,
     ) -> Proof<Bls12_381> {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -124,19 +124,19 @@ mod tests {
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
-        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
-        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+        let preprocessed_circuit = composer.preprocess(ck, &mut transcript, &domain);
+        composer.prove(ck, &preprocessed_circuit, &mut transcript)
     }
 
     fn verify_binary(
-        domain: &EvaluationDomain<Fr>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
-        let possible_bit = composer.add_input(Fr::from_str("56").unwrap());
+        let possible_bit = composer.add_input(Scalar::from(56u64));
         binary_constrain(&mut composer, possible_bit.into());
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -146,14 +146,14 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fr::zero(), Fr::zero(), Fr::zero()],
+            &vec![Scalar::zero(), Scalar::zero(), Scalar::zero()],
         )
     }
 
-    fn binary_roundtrip_helper(possible_bit: Fr) -> bool {
+    fn binary_roundtrip_helper(possible_bit: Scalar) -> bool {
         let public_parameters = setup(8, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 8).unwrap();
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(8).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(8).unwrap();
 
         let proof = prove_binary(&domain, &ck, possible_bit);
         verify_binary(&domain, &ck, &vk, &proof)
@@ -161,17 +161,17 @@ mod tests {
 
     #[test]
     fn binary_constraint_test() {
-        assert!(binary_roundtrip_helper(Fr::zero()));
-        assert!(binary_roundtrip_helper(Fr::one()));
-        assert!(!binary_roundtrip_helper(Fr::one() + Fr::one()));
+        assert!(binary_roundtrip_helper(Scalar::zero()));
+        assert!(binary_roundtrip_helper(Scalar::one()));
+        assert!(!binary_roundtrip_helper(Scalar::one() + Scalar::one()));
     }
 
     fn prove_cond_select_zero(
-        domain: &EvaluationDomain<Fr>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
-        num: Fr,
-        select: Fr,
-        expected: Fr,
+        num: Scalar,
+        select: Scalar,
+        expected: Scalar,
     ) -> Proof<Bls12_381> {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -179,7 +179,7 @@ mod tests {
         let select = composer.add_input(select);
         let select = binary_constrain(&mut composer, select.into());
         let selected = conditionally_select_zero(&mut composer, num.into(), select.into());
-        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.constrain_to_constant(selected, expected, Scalar::zero());
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -188,19 +188,19 @@ mod tests {
     }
 
     fn verify_cond_select_zero(
-        domain: &EvaluationDomain<Fr>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
-        expected: Fr,
+        expected: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
-        let num = composer.add_input(Fr::from_str("46").unwrap());
-        let select = composer.add_input(Fr::from_str("36").unwrap());
+        let num = composer.add_input(Scalar::from(46u64));
+        let select = composer.add_input(Scalar::from(36u64));
         let select = binary_constrain(&mut composer, select.into());
         let selected = conditionally_select_zero(&mut composer, num.into(), select.into());
-        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.constrain_to_constant(selected, expected, Scalar::zero());
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -209,14 +209,14 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fr::zero()],
+            &vec![Scalar::zero()],
         )
     }
 
-    fn cond_select_zero_roundtrip_helper(num: Fr, selector: Fr, expected: Fr) -> bool {
+    fn cond_select_zero_roundtrip_helper(num: Scalar, selector: Scalar, expected: Scalar) -> bool {
         let public_parameters = setup(16, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16).unwrap();
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_cond_select_zero(&domain, &ck, num, selector, expected);
         verify_cond_select_zero(&domain, &ck, &vk, &proof, expected)
@@ -224,20 +224,20 @@ mod tests {
 
     #[test]
     fn test_conditionally_select_zero() {
-        let one = Fr::one();
+        let one = Scalar::one();
         let two = one + one;
-        let zero = Fr::zero();
+        let zero = Scalar::zero();
 
         assert!(cond_select_zero_roundtrip_helper(two, one, two));
         assert!(cond_select_zero_roundtrip_helper(two, zero, zero));
     }
 
     fn prove_cond_select_one(
-        domain: &EvaluationDomain<Fr>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
-        num: Fr,
-        select: Fr,
-        expected: Fr,
+        num: Scalar,
+        select: Scalar,
+        expected: Scalar,
     ) -> Proof<Bls12_381> {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -245,7 +245,7 @@ mod tests {
         let select = composer.add_input(select);
         let select = binary_constrain(&mut composer, select.into());
         let selected = conditionally_select_one(&mut composer, num, select.into());
-        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.constrain_to_constant(selected, expected, Scalar::zero());
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -254,19 +254,19 @@ mod tests {
     }
 
     fn verify_cond_select_one(
-        domain: &EvaluationDomain<Fr>,
+        domain: &EvaluationDomain,
         ck: &Powers<Bls12_381>,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
-        expected: Fr,
+        expected: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
-        let num = composer.add_input(Fr::from_str("46").unwrap());
-        let select = composer.add_input(Fr::from_str("36").unwrap());
+        let num = composer.add_input(Scalar::from(46u64));
+        let select = composer.add_input(Scalar::from(36u64));
         let select = binary_constrain(&mut composer, select.into());
         let selected = conditionally_select_one(&mut composer, num, select.into());
-        composer.constrain_to_constant(selected, expected, Fr::zero());
+        composer.constrain_to_constant(selected, expected, Scalar::zero());
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
@@ -275,14 +275,14 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fr::zero()],
+            &vec![Scalar::zero()],
         )
     }
 
-    fn cond_select_one_roundtrip_helper(num: Fr, selector: Fr, expected: Fr) -> bool {
+    fn cond_select_one_roundtrip_helper(num: Scalar, selector: Scalar, expected: Scalar) -> bool {
         let public_parameters = setup(16, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16).unwrap();
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_cond_select_one(&domain, &ck, num, selector, expected);
         verify_cond_select_one(&domain, &ck, &vk, &proof, expected)
@@ -290,19 +290,19 @@ mod tests {
 
     #[test]
     fn test_conditionally_select_one() {
-        let one = Fr::one();
+        let one = Scalar::one();
         let two = one + one;
-        let zero = Fr::zero();
+        let zero = Scalar::zero();
 
         assert!(cond_select_one_roundtrip_helper(two, one, two));
         assert!(cond_select_one_roundtrip_helper(two, zero, one));
     }
 
     fn prove_is_non_zero(
-        domain: &EvaluationDomain<Fr>,
-        ck: &Powers<Bls12_381>,
-        num: Fr,
-        inv_num: Fr,
+        domain: &EvaluationDomain,
+        ck: &ProverKey,
+        num: Scalar,
+        inv_num: Scalar,
     ) -> Proof<Bls12_381> {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -311,37 +311,37 @@ mod tests {
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
-        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
-        composer.prove(&ck, &preprocessed_circuit, &mut transcript)
+        let preprocessed_circuit = composer.preprocess(ck, &mut transcript, &domain);
+        composer.prove(ck, &preprocessed_circuit, &mut transcript)
     }
 
     fn verify_is_non_zero(
-        domain: &EvaluationDomain<Fr>,
-        ck: &Powers<Bls12_381>,
+        domain: &EvaluationDomain,
+        ck: &ProverKey,
         vk: &VerifierKey<Bls12_381>,
         proof: &Proof<Bls12_381>,
-        num: Fr,
+        num: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
-        let num = composer.add_input(Fr::from_str("46").unwrap());
+        let num = composer.add_input(Scalar::from(46u64));
         is_non_zero(&mut composer, num, None);
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
         composer.add_dummy_constraints();
-        let preprocessed_circuit = composer.preprocess(&ck, &mut transcript, &domain);
+        let preprocessed_circuit = composer.preprocess(ck, &mut transcript, domain);
         proof.verify(
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fr::zero()],
+            &vec![Scalar::zero()],
         )
     }
 
-    fn is_non_zero_roundtrip_helper(num: Fr, inv_num: Fr) -> bool {
+    fn is_non_zero_roundtrip_helper(num: Scalar, inv_num: Scalar) -> bool {
         let public_parameters = setup(16, &mut rand::thread_rng());
         let (ck, vk) = trim(&public_parameters, 16).unwrap();
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(16).unwrap();
+        let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_is_non_zero(&domain, &ck, num, inv_num);
         verify_is_non_zero(&domain, &ck, &vk, &proof, num)
@@ -349,9 +349,9 @@ mod tests {
 
     #[test]
     fn test_is_non_zero() {
-        let one = Fr::one();
-        let three = Fr::from(3u8);
-        let zero = Fr::zero();
+        let one = Scalar::one();
+        let three = Scalar::from(3u8);
+        let zero = Scalar::zero();
         use algebra::fields::Field;
         let inv_three = three.inverse().unwrap();
 
