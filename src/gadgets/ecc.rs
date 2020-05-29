@@ -1,12 +1,9 @@
 use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::scalar::*;
-use algebra::curves::models::TEModelParameters;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
 use dusk_plonk::constraint_system::Variable;
-use jubjub::Fr;
 use jubjub::{JubJubParameters, JubJubProjective};
-use num_traits::{One, Zero};
 
 pub type Bls12_381Composer = StandardComposer;
 /// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
@@ -49,102 +46,152 @@ impl JubJubPointGadget {
         let A = composer.mul(
             self.X,
             other.X,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute B
         let B = composer.mul(
             self.Y,
             other.Y,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute C
-        let C = composer.mul(self.T, other.T, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
+        let C = composer.mul(
+            self.T,
+            other.T,
+            coeff_d,
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute D
         let D = composer.mul(
             self.Z,
             other.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute E
         let E = {
             let E1 = composer.add(
                 self.X,
                 self.Y,
-                Fr::one(),
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             );
             let E2 = composer.add(
                 other.X,
                 other.Y,
-                Fr::one(),
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             );
-            let E12 = composer.mul(E1, E2, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+            let E12 = composer.mul(
+                E1,
+                E2,
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
+            );
             // aA + aB
-            let aAaB = composer.add(A, B, coeff_a, coeff_a, -Fr::one(), Fr::zero(), Fr::zero());
+            let aAaB = composer.add(
+                A,
+                B,
+                coeff_a,
+                coeff_a,
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
+            );
             // Return E
             composer.add(
                 E12,
                 aAaB,
-                Fr::one(),
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             )
         };
         // Compute F
         let F = composer.add(
             D.into(),
             C.into(),
-            Fr::one(),
-            -Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
 
         // Compute G
         let G = composer.add(
             D.into(),
             C.into(),
-            Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
 
         // Compute H
         let H = composer.add(
             A.into(),
             B.into(),
-            Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute new point coords
-        let new_x = composer.mul(E, F, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_y = composer.mul(G, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_z = composer.mul(F, G, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_t = composer.mul(E, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_x = composer.mul(
+            E,
+            F,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_y = composer.mul(
+            G,
+            H,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_z = composer.mul(
+            F,
+            G,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_t = composer.mul(
+            E,
+            H,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
 
         JubJubPointGadget {
             X: new_x,
@@ -176,28 +223,28 @@ impl JubJubPointGadget {
         let A = composer.mul(
             self.X,
             self.X,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute B
         let B = composer.mul(
             self.Y,
             self.Y,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute C
         let C = composer.mul(
             self.Z,
             self.Z,
-            Fr::from(2u8),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::from(2u64),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // D comp is skipped and scaled when used.
         // Compute E
@@ -205,66 +252,102 @@ impl JubJubPointGadget {
             let p1_x_y = composer.add(
                 self.X,
                 self.Y,
-                Fr::one(),
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             );
             let p1_x_y_sq = composer.mul(
                 p1_x_y,
                 p1_x_y,
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             );
             let min_a_min_b = composer.add(
                 A,
                 B,
-                -Fr::one(),
-                -Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                -Scalar::one(),
+                -Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             );
             composer.add(
                 p1_x_y_sq,
                 min_a_min_b,
-                Fr::one(),
-                Fr::one(),
-                -Fr::one(),
-                Fr::zero(),
-                Fr::zero(),
+                Scalar::one(),
+                Scalar::one(),
+                -Scalar::one(),
+                Scalar::zero(),
+                Scalar::zero(),
             )
         };
         // Compute G
-        let G = composer.add(A, B, coeff_a, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let G = composer.add(
+            A,
+            B,
+            coeff_a,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute F
         let F = composer.add(
             G,
             C,
-            Fr::one(),
-            -Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute H
         let H = composer.add(
             A,
             B,
             coeff_a,
-            -Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            -Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute point coordinates
-        let new_x = composer.mul(E, F, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_y = composer.mul(G, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_z = composer.mul(F, G, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
-        let new_t = composer.mul(E, H, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let new_x = composer.mul(
+            E,
+            F,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_y = composer.mul(
+            G,
+            H,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_z = composer.mul(
+            F,
+            G,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
+        let new_t = composer.mul(
+            E,
+            H,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
 
         JubJubPointGadget {
             X: new_x.into(),
@@ -280,58 +363,58 @@ impl JubJubPointGadget {
         let a = composer.mul(
             self.X,
             other.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         let b = composer.mul(
             other.X,
             self.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Constraint a - b == 0
         let a_min_b = composer.add(
             a.into(),
             b.into(),
-            -Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            -Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
-        composer.constrain_to_constant(a_min_b, Fr::zero(), Fr::zero());
+        composer.constrain_to_constant(a_min_b, Scalar::zero(), Scalar::zero());
         // Second assigment
         let c = composer.mul(
             self.Y,
             other.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         let d = composer.mul(
             other.Y,
             self.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Constraint c - d == 0
         let c_min_d = composer.add(
             c,
             d,
-            Fr::one(),
-            -Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
-        composer.constrain_to_constant(c_min_d, Fr::zero(), Fr::zero());
+        composer.constrain_to_constant(c_min_d, Scalar::zero(), Scalar::zero());
     }
     /// Adds constraints to ensure that the point satisfies the JubJub curve eq
     /// by verifying `(aX^{2}+Y^{2})Z^{2} = Z^{4}+d(X^{2})Y^{2}`
@@ -342,72 +425,100 @@ impl JubJubPointGadget {
         let coeff_d = JubJubParameters::COEFF_D;
 
         // Compute a * X²
-        let a_x_sq = composer.mul(self.X, self.X, coeff_a, -Fr::one(), Fr::zero(), Fr::zero());
+        let a_x_sq = composer.mul(
+            self.X,
+            self.X,
+            coeff_a,
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute Y²
         let y_sq = composer.mul(
             self.Y,
             self.Y,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute a*X² + Y²
         let a_xsq_ysq = composer.add(
             a_x_sq,
             y_sq,
-            Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute Z²
         let z_sq = composer.mul(
             self.Z,
             self.Z,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Compute left assigment
         let left_assig = composer.mul(
             a_xsq_ysq,
             z_sq,
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
 
         // Compute Z⁴
-        let z_sq_sq = composer.mul(z_sq, z_sq, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let z_sq_sq = composer.mul(
+            z_sq,
+            z_sq,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute d * X²
-        let d_x_sq = composer.mul(self.X, self.X, coeff_d, -Fr::one(), Fr::zero(), Fr::zero());
+        let d_x_sq = composer.mul(
+            self.X,
+            self.X,
+            coeff_d,
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute d*(X²) * Y²
-        let d_x_sq_y_sq = composer.mul(d_x_sq, y_sq, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero());
+        let d_x_sq_y_sq = composer.mul(
+            d_x_sq,
+            y_sq,
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
+        );
         // Compute right assigment
         let right_assig = composer.add(
             z_sq_sq.into(),
             d_x_sq_y_sq.into(),
-            Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
         // Constrain right_assig = left_assig
         let should_be_zero = composer.add(
             left_assig.into(),
             right_assig.into(),
-            -Fr::one(),
-            Fr::one(),
-            -Fr::one(),
-            Fr::zero(),
-            Fr::zero(),
+            -Scalar::one(),
+            Scalar::one(),
+            -Scalar::one(),
+            Scalar::zero(),
+            Scalar::zero(),
         );
-        composer.constrain_to_constant(should_be_zero, Fr::zero(), Fr::zero());
+        composer.constrain_to_constant(should_be_zero, Scalar::zero(), Scalar::zero());
     }
 
     /// Gets an Scalar represented as a BoolVar array in Big Endian
@@ -417,8 +528,8 @@ impl JubJubPointGadget {
         composer: &mut StandardComposer,
         scalar: &[BoolVar],
     ) -> JubJubPointGadget {
-        let zero = composer.add_input(Fr::zero());
-        let one = composer.add_input(Fr::one());
+        let zero = composer.add_input(Scalar::zero());
+        let one = composer.add_input(Scalar::one());
 
         let mut Q = JubJubPointGadget {
             X: zero.into(),
@@ -477,15 +588,13 @@ impl JubJubPointGadget {
 
 mod tests {
     use super::*;
-    use crate::gadgets::scalar::*;
-    use algebra::curves::jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
-    use algebra::fields::jubjub::{fq::Fq, fr::Fr};
-    use dusk_plonk::constraint_system::{proof::Proof, Composer};
+    use dusk_plonk::commitment_scheme::kzg10::srs::*;
+    use dusk_plonk::commitment_scheme::kzg10::{ProverKey, VerifierKey};
     use dusk_plonk::fft::EvaluationDomain;
-    use dusk_plonk::srs::*;
+    use dusk_plonk::proof_system::Proof;
+    use jubjub::{Fq, Fr};
+    use jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
     use merlin::Transcript;
-    use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
-    use std::ops::{Add, Mul};
 
     fn gen_transcript() -> Transcript {
         Transcript::new(b"jubjub_ecc_ops")
@@ -502,9 +611,9 @@ mod tests {
         let (x, y) = JubJubParameters::AFFINE_GENERATOR_COEFFS;
         let identity = JubJubProjective::zero();
         let gen = JubJubAffine::new(x, y);
-        let two_gen = gen.mul(Fr::from(2u8));
+        let two_gen = gen.mul(Fr::from(2u64));
         let gen_p_two_gen = two_gen.add(gen);
-        let k_times_gen = gen.mul(Fr::from(127u8));
+        let k_times_gen = gen.mul(Fr::from(127u64));
 
         (
             identity,
@@ -517,10 +626,10 @@ mod tests {
 
     fn prove_point_equalty(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Import point
@@ -538,9 +647,9 @@ mod tests {
 
     fn verify_point_equalty(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
     ) -> bool {
@@ -565,8 +674,8 @@ mod tests {
     }
 
     fn point_equalty_roundtrip_helper(P1: &JubJubProjective, P2: &JubJubProjective) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_equalty(&domain, &ck, P1, P2);
@@ -586,11 +695,11 @@ mod tests {
 
     fn prove_conditionally_select_identity(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
         selector: &Fq,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         let selector = composer.add_input(*selector);
@@ -610,9 +719,9 @@ mod tests {
 
     fn verify_conditionally_select_identity(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
         selector: &Fq,
@@ -644,8 +753,8 @@ mod tests {
         P2: &JubJubProjective,
         selector: &Fq,
     ) -> bool {
-        let public_parameters = setup(512, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 512).unwrap();
+        let public_parameters = PublicParameters::setup(512, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(512).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(512).unwrap();
 
         let proof = prove_conditionally_select_identity(&domain, &ck, P1, P2, selector);
@@ -675,11 +784,11 @@ mod tests {
 
     fn prove_point_addition(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
         P_res: &JubJubProjective,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Import both points
@@ -699,9 +808,9 @@ mod tests {
 
     fn verify_point_addition(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
         P_res: &JubJubProjective,
@@ -733,8 +842,8 @@ mod tests {
         P2: &JubJubProjective,
         P_res: &JubJubProjective,
     ) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_addition(&domain, &ck, P1, P2, P_res);
@@ -752,10 +861,10 @@ mod tests {
 
     fn prove_point_doubling(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
         P_res: &JubJubProjective,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Import both points
@@ -774,9 +883,9 @@ mod tests {
 
     fn verify_point_doubling(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
         P_res: &JubJubProjective,
     ) -> bool {
@@ -802,8 +911,8 @@ mod tests {
     }
 
     fn point_doubling_roundtrip_helper(P1: &JubJubProjective, P_res: &JubJubProjective) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_point_doubling(&domain, &ck, P1, P_res);
@@ -820,9 +929,9 @@ mod tests {
 
     fn prove_curve_eq_satisfy(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Gen Point gadgets
@@ -838,9 +947,9 @@ mod tests {
 
     fn verify_curve_eq_satisfy(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
     ) -> bool {
         let mut transcript = gen_transcript();
@@ -862,8 +971,8 @@ mod tests {
     }
 
     fn curve_eq_satisfy_roundtrip_helper(P1: &JubJubProjective) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_curve_eq_satisfy(&domain, &ck, P1);
@@ -881,11 +990,11 @@ mod tests {
 
     fn prove_scalar_mul(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         P1: &JubJubProjective,
         scalar_bits: &[u8],
         P_res: &JubJubProjective,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Gen Point gadgets & scalar boolvars
@@ -913,9 +1022,9 @@ mod tests {
 
     fn verify_scalar_mul(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         P1: &JubJubProjective,
         scalar_bits: &[u8],
         P_res: &JubJubProjective,
@@ -955,8 +1064,8 @@ mod tests {
         P_res: &JubJubProjective,
         scalar_bits: &[u8],
     ) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_scalar_mul(&domain, &ck, P1, scalar_bits, P_res);
@@ -966,7 +1075,7 @@ mod tests {
     #[test]
     fn test_scalar_mul() {
         let (_, P1, _, _, P_res) = testing_points();
-        let P_res_2 = P1.mul(&Fr::from(125u8));
+        let P_res_2 = P1.mul(&Fr::from(125u64));
         let scalar_bits = [
             1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

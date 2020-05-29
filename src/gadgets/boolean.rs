@@ -1,4 +1,4 @@
-use dusk_plonk::constraint_system::constraint_system::Variable;
+use dusk_plonk::constraint_system::Variable;
 
 /// Represents a Variable that has already
 /// been constrained to be either one or zero.

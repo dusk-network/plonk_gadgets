@@ -1,13 +1,11 @@
 use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::ecc::*;
 use crate::gadgets::scalar;
-use algebra::fields::PrimeField;
-use bls12_381::Bls12_381;
+use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
 use dusk_plonk::constraint_system::Variable;
 use jubjub::JubJubProjective;
 use jubjub::{Fq, Fr};
-use rand::{thread_rng, RngCore};
 
 pub fn sk_knowledge(
     composer: &mut StandardComposer,
@@ -21,13 +19,13 @@ pub fn sk_knowledge(
     let sk = match scalar {
         Some(fr) => fr,
         // XXX: Should be a randomly generated variable
-        None => Fr::from(55u8),
+        None => Fr::from(55u64),
     };
     let sk_bits = scalar_to_bits(&sk);
 
     let committed_vars = sk_bits
         .iter()
-        .map(|bit| composer.add_input(Fq::from(*bit)))
+        .map(|bit| composer.add_input(Scalar::from(*bit as u64)))
         .collect::<Vec<Variable>>();
     let committed_boolvars = committed_vars
         .into_iter()
@@ -67,15 +65,13 @@ fn scalar_to_bits(scalar: &Fr) -> Vec<u8> {
 
 mod test {
     use super::*;
-    use algebra::curves::models::TEModelParameters;
-    use dusk_plonk::constraint_system::{proof::Proof, Composer};
+    use dusk_plonk::commitment_scheme::kzg10::srs::*;
+    use dusk_plonk::commitment_scheme::kzg10::{ProverKey, VerifierKey};
+    use dusk_plonk::constraint_system::StandardComposer;
     use dusk_plonk::fft::EvaluationDomain;
-    use dusk_plonk::srs::*;
+    use dusk_plonk::proof_system::Proof;
     use jubjub::{JubJubAffine, JubJubParameters};
     use merlin::Transcript;
-    use num_traits::identities::{One, Zero};
-    use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
-    use std::ops::{Add, Mul};
 
     fn gen_transcript() -> Transcript {
         Transcript::new(b"jubjub_ecc_ops")
@@ -92,9 +88,9 @@ mod test {
         let (x, y) = JubJubParameters::AFFINE_GENERATOR_COEFFS;
         let identity = JubJubProjective::zero();
         let gen = JubJubAffine::new(x, y);
-        let two_gen = gen.mul(Fr::from(2u8));
+        let two_gen = gen.mul(Fr::from(2u64));
         let gen_p_two_gen = two_gen.add(gen);
-        let k_times_gen = gen.mul(Fr::from(127u8));
+        let k_times_gen = gen.mul(Fr::from(127u64));
 
         (
             identity,
@@ -107,11 +103,11 @@ mod test {
 
     fn prove_sk_knowledge(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         basep: &JubJubProjective,
         pk: &JubJubProjective,
         scalar: Option<Fr>,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         // Gen Point gadgets
@@ -128,9 +124,9 @@ mod test {
 
     fn verify_sk_knowledge(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         basep: &JubJubProjective,
         pk: &JubJubProjective,
         scalar: Option<Fr>,
@@ -159,8 +155,8 @@ mod test {
         pk: &JubJubProjective,
         scalar: Option<Fr>,
     ) -> bool {
-        let public_parameters = setup(16384, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16384).unwrap();
+        let public_parameters = PublicParameters::setup(16384, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16384).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16384).unwrap();
 
         let proof = prove_sk_knowledge(&domain, &ck, basep, pk, scalar);

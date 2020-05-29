@@ -1,11 +1,7 @@
 use crate::gadgets::boolean::BoolVar;
-use algebra::fields::PrimeField;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
-use dusk_plonk::constraint_system::constraint_system::Variable;
-use jubjub::Fr;
-use num_traits::{One, Zero};
-use rand::RngCore;
+use dusk_plonk::constraint_system::Variable;
 
 /// Conditionally selects the value provided or a zero instead.
 /// NOTE that the `select` input has to be previously constrained to
@@ -18,7 +14,7 @@ pub fn conditionally_select_zero(
     x: Variable,
     select: Variable,
 ) -> Variable {
-    composer.mul(x, select, Fr::one(), -Fr::one(), Fr::zero(), Fr::zero())
+    composer.mul(Scalar::one(), x, select, Scalar::zero(), Scalar::zero())
 }
 
 /// Conditionally selects the value provided or a one instead.
@@ -36,30 +32,23 @@ pub fn conditionally_select_one(
     let one = composer.add_input(Scalar::one());
     // bit * y
     let bit_y = composer.mul(
+        Scalar::one(),
         select.into(),
         y,
-        Scalar::one(),
-        -Scalar::one(),
         Scalar::zero(),
         Scalar::zero(),
     );
     // 1 - bit
     let one_min_bit = composer.add(
-        one,
-        select.into(),
-        Scalar::one(),
-        -Scalar::one(),
-        -Scalar::one(),
+        (Scalar::one(), one),
+        (-Scalar::one(), select.into()),
         Scalar::zero(),
         Scalar::zero(),
     );
     // bit * y + (1 - bit)
     composer.add(
-        bit_y,
-        one_min_bit,
-        Scalar::one(),
-        Scalar::one(),
-        -Scalar::one(),
+        (Scalar::one(), bit_y),
+        (Scalar::one(), one_min_bit),
         Scalar::zero(),
         Scalar::zero(),
     )
@@ -100,23 +89,18 @@ pub fn binary_constrain(composer: &mut StandardComposer, bit: Variable) -> BoolV
 
 mod tests {
     use super::*;
-    use dusk_plonk::constraint_system::proof::Proof;
-    use dusk_plonk::constraint_system::Composer;
+    use dusk_plonk::commitment_scheme::kzg10::srs::*;
+    use dusk_plonk::commitment_scheme::kzg10::{ProverKey, VerifierKey};
+    use dusk_plonk::constraint_system::composer::StandardComposer;
     use dusk_plonk::fft::EvaluationDomain;
-    use dusk_plonk::srs::*;
+    use dusk_plonk::proof_system::Proof;
     use merlin::Transcript;
-    use poly_commit::kzg10::{Powers, ProverKey, UniversalParams, VerifierKey};
-    use std::str::FromStr;
 
     fn gen_transcript() -> Transcript {
         Transcript::new(b"TESTING")
     }
 
-    fn prove_binary(
-        domain: &EvaluationDomain,
-        ck: &ProverKey,
-        possible_bit: Scalar,
-    ) -> Proof<Bls12_381> {
+    fn prove_binary(domain: &EvaluationDomain, ck: &ProverKey, possible_bit: Scalar) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         let possible_bit = composer.add_input(possible_bit);
@@ -130,9 +114,9 @@ mod tests {
 
     fn verify_binary(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -151,8 +135,8 @@ mod tests {
     }
 
     fn binary_roundtrip_helper(possible_bit: Scalar) -> bool {
-        let public_parameters = setup(8, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 8).unwrap();
+        let public_parameters = PublicParameters::setup(8, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(8).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(8).unwrap();
 
         let proof = prove_binary(&domain, &ck, possible_bit);
@@ -168,11 +152,11 @@ mod tests {
 
     fn prove_cond_select_zero(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         num: Scalar,
         select: Scalar,
         expected: Scalar,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         let num = composer.add_input(num);
@@ -189,9 +173,9 @@ mod tests {
 
     fn verify_cond_select_zero(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         expected: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
@@ -214,8 +198,8 @@ mod tests {
     }
 
     fn cond_select_zero_roundtrip_helper(num: Scalar, selector: Scalar, expected: Scalar) -> bool {
-        let public_parameters = setup(16, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let public_parameters = PublicParameters::setup(16, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_cond_select_zero(&domain, &ck, num, selector, expected);
@@ -234,11 +218,11 @@ mod tests {
 
     fn prove_cond_select_one(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
+        ck: &ProverKey,
         num: Scalar,
         select: Scalar,
         expected: Scalar,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         let num = composer.add_input(num);
@@ -255,9 +239,9 @@ mod tests {
 
     fn verify_cond_select_one(
         domain: &EvaluationDomain,
-        ck: &Powers<Bls12_381>,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        ck: &ProverKey,
+        vk: &VerifierKey,
+        proof: &Proof,
         expected: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
@@ -280,8 +264,8 @@ mod tests {
     }
 
     fn cond_select_one_roundtrip_helper(num: Scalar, selector: Scalar, expected: Scalar) -> bool {
-        let public_parameters = setup(16, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let public_parameters = PublicParameters::setup(16, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_cond_select_one(&domain, &ck, num, selector, expected);
@@ -303,7 +287,7 @@ mod tests {
         ck: &ProverKey,
         num: Scalar,
         inv_num: Scalar,
-    ) -> Proof<Bls12_381> {
+    ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
         let num = composer.add_input(num);
@@ -318,8 +302,8 @@ mod tests {
     fn verify_is_non_zero(
         domain: &EvaluationDomain,
         ck: &ProverKey,
-        vk: &VerifierKey<Bls12_381>,
-        proof: &Proof<Bls12_381>,
+        vk: &VerifierKey,
+        proof: &Proof,
         num: Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
@@ -339,8 +323,8 @@ mod tests {
     }
 
     fn is_non_zero_roundtrip_helper(num: Scalar, inv_num: Scalar) -> bool {
-        let public_parameters = setup(16, &mut rand::thread_rng());
-        let (ck, vk) = trim(&public_parameters, 16).unwrap();
+        let public_parameters = PublicParameters::setup(16, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = public_parameters.trim(16).unwrap();
         let domain: EvaluationDomain = EvaluationDomain::new(16).unwrap();
 
         let proof = prove_is_non_zero(&domain, &ck, num, inv_num);
