@@ -5,8 +5,8 @@ use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
 use algebra::curves::models::TEModelParameters;
 use algebra::fields::bls12_381::Fr;
 use num_traits::{One, Zero};
-use plonk::cs::composer::StandardComposer;
-use plonk::cs::constraint_system::Variable;
+use dusk_plonk::cs::composer::StandardComposer;
+use dusk_plonk::cs::constraint_system::Variable;
 
 pub type Bls12_381Composer = StandardComposer<Bls12_381>;
 /// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
@@ -482,8 +482,8 @@ mod tests {
     use algebra::fields::jubjub::{fq::Fq, fr::Fr};
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use plonk::cs::{proof::Proof, Composer};
-    use plonk::srs::*;
+    use dusk_plonk::cs::{proof::Proof, Composer};
+    use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::ops::{Add, Mul};
 

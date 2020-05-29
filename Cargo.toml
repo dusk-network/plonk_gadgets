@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 num-traits = "0.2"
-plonk = { git = "https://github.com/dusk-network/plonk", branch = "fast_prover_zexe" }
+dusk-plonk = { git = "https://github.com/dusk-network/plonk", tag = "v0.1.0" }
 algebra = { git = "https://github.com/scipr-lab/zexe/", features = [ "parallel" ] }
 ff-fft = { git = "https://github.com/scipr-lab/zexe/" }
 poly-commit = { git = "https://github.com/scipr-lab/poly-commit", branch = "master" }

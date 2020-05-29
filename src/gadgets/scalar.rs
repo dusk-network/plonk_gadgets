@@ -3,8 +3,8 @@ use algebra::curves::bls12_381::Bls12_381;
 use algebra::fields::bls12_381::fr::Fr;
 use algebra::fields::PrimeField;
 use num_traits::{One, Zero};
-use plonk::cs::composer::StandardComposer;
-use plonk::cs::constraint_system::Variable;
+use dusk_plonk::cs::composer::StandardComposer;
+use dusk_plonk::cs::constraint_system::Variable;
 use rand::RngCore;
 
 /// Conditionally selects the value provided or a zero instead.
@@ -106,9 +106,9 @@ mod tests {
     use super::*;
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use plonk::cs::proof::Proof;
-    use plonk::cs::Composer;
-    use plonk::srs::*;
+    use dusk_plonk::cs::proof::Proof;
+    use dusk_plonk::cs::Composer;
+    use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::str::FromStr;
 

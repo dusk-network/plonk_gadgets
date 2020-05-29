@@ -6,8 +6,8 @@ use algebra::curves::jubjub::JubJubProjective;
 use algebra::fields::jubjub::{fq::Fq, fr::Fr};
 use algebra::fields::PrimeField;
 use algebra::ToBytes;
-use plonk::cs::composer::StandardComposer;
-use plonk::cs::constraint_system::Variable;
+use dusk_plonk::cs::composer::StandardComposer;
+use dusk_plonk::cs::constraint_system::Variable;
 use rand::{thread_rng, RngCore};
 
 pub fn sk_knowledge(
@@ -73,8 +73,8 @@ mod test {
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
     use num_traits::identities::{One, Zero};
-    use plonk::cs::{proof::Proof, Composer};
-    use plonk::srs::*;
+    use dusk_plonk::cs::{proof::Proof, Composer};
+    use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::ops::{Add, Mul};
 
