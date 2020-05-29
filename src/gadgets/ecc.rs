@@ -44,154 +44,83 @@ impl JubJubPointGadget {
         //
         // Compute A
         let A = composer.mul(
+            Scalar::one(),
             self.X,
             other.X,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute B
         let B = composer.mul(
+            Scalar::one(),
             self.Y,
             other.Y,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute C
-        let C = composer.mul(
-            self.T,
-            other.T,
-            coeff_d,
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let C = composer.mul(coeff_d, self.T, other.T, Scalar::zero(), Scalar::zero());
         // Compute D
         let D = composer.mul(
+            Scalar::one(),
             self.Z,
             other.Z,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute E
         let E = {
             let E1 = composer.add(
-                self.X,
-                self.Y,
-                Scalar::one(),
-                Scalar::one(),
-                -Scalar::one(),
+                (Scalar::one(), self.X),
+                (Scalar::one(), self.Y),
                 Scalar::zero(),
                 Scalar::zero(),
             );
             let E2 = composer.add(
-                other.X,
-                other.Y,
-                Scalar::one(),
-                Scalar::one(),
-                -Scalar::one(),
+                (Scalar::one(), other.X),
+                (Scalar::one(), other.Y),
                 Scalar::zero(),
                 Scalar::zero(),
             );
-            let E12 = composer.mul(
-                E1,
-                E2,
-                Scalar::one(),
-                -Scalar::one(),
-                Scalar::zero(),
-                Scalar::zero(),
-            );
+            let E12 = composer.mul(Scalar::one(), E1, E2, Scalar::zero(), Scalar::zero());
             // aA + aB
-            let aAaB = composer.add(
-                A,
-                B,
-                coeff_a,
-                coeff_a,
-                -Scalar::one(),
-                Scalar::zero(),
-                Scalar::zero(),
-            );
+            let aAaB = composer.add((coeff_a, A), (coeff_a, B), Scalar::zero(), Scalar::zero());
             // Return E
             composer.add(
-                E12,
-                aAaB,
-                Scalar::one(),
-                Scalar::one(),
-                -Scalar::one(),
+                (Scalar::one(), E12),
+                (Scalar::one(), aAaB),
                 Scalar::zero(),
                 Scalar::zero(),
             )
         };
         // Compute F
         let F = composer.add(
-            D.into(),
-            C.into(),
-            Scalar::one(),
-            -Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), D.into()),
+            (-Scalar::one(), C.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
 
         // Compute G
         let G = composer.add(
-            D.into(),
-            C.into(),
-            Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), D.into()),
+            (Scalar::one(), C.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
 
         // Compute H
         let H = composer.add(
-            A.into(),
-            B.into(),
-            Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), A.into()),
+            (Scalar::one(), B.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute new point coords
-        let new_x = composer.mul(
-            E,
-            F,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_y = composer.mul(
-            G,
-            H,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_z = composer.mul(
-            F,
-            G,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_t = composer.mul(
-            E,
-            H,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let new_x = composer.mul(Scalar::one(), E, F, Scalar::zero(), Scalar::zero());
+        let new_y = composer.mul(Scalar::one(), G, H, Scalar::zero(), Scalar::zero());
+        let new_z = composer.mul(Scalar::one(), F, G, Scalar::zero(), Scalar::zero());
+        let new_t = composer.mul(Scalar::one(), E, H, Scalar::zero(), Scalar::zero());
 
         JubJubPointGadget {
             X: new_x,
@@ -221,28 +150,25 @@ impl JubJubPointGadget {
 
         // Compute A
         let A = composer.mul(
-            self.X,
-            self.X,
             Scalar::one(),
-            -Scalar::one(),
+            self.X,
+            self.X,
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute B
         let B = composer.mul(
-            self.Y,
-            self.Y,
             Scalar::one(),
-            -Scalar::one(),
+            self.Y,
+            self.Y,
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute C
         let C = composer.mul(
-            self.Z,
-            self.Z,
             Scalar::from(2u64),
-            -Scalar::one(),
+            self.Z,
+            self.Z,
             Scalar::zero(),
             Scalar::zero(),
         );
@@ -250,104 +176,57 @@ impl JubJubPointGadget {
         // Compute E
         let E = {
             let p1_x_y = composer.add(
-                self.X,
-                self.Y,
-                Scalar::one(),
-                Scalar::one(),
-                -Scalar::one(),
+                (Scalar::one(), self.X),
+                (Scalar::one(), self.Y),
                 Scalar::zero(),
                 Scalar::zero(),
             );
             let p1_x_y_sq = composer.mul(
-                p1_x_y,
-                p1_x_y,
                 Scalar::one(),
-                -Scalar::one(),
+                p1_x_y,
+                p1_x_y,
                 Scalar::zero(),
                 Scalar::zero(),
             );
             let min_a_min_b = composer.add(
-                A,
-                B,
-                -Scalar::one(),
-                -Scalar::one(),
-                -Scalar::one(),
+                (-Scalar::one(), A),
+                (-Scalar::one(), B),
                 Scalar::zero(),
                 Scalar::zero(),
             );
             composer.add(
-                p1_x_y_sq,
-                min_a_min_b,
-                Scalar::one(),
-                Scalar::one(),
-                -Scalar::one(),
+                (Scalar::one(), p1_x_y_sq),
+                (Scalar::one(), min_a_min_b),
                 Scalar::zero(),
                 Scalar::zero(),
             )
         };
         // Compute G
         let G = composer.add(
-            A,
-            B,
-            coeff_a,
-            Scalar::one(),
-            -Scalar::one(),
+            (coeff_a, A),
+            (Scalar::one(), B),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute F
         let F = composer.add(
-            G,
-            C,
-            Scalar::one(),
-            -Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), G),
+            (Scalar::one(), C),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute H
         let H = composer.add(
-            A,
-            B,
-            coeff_a,
-            -Scalar::one(),
-            -Scalar::one(),
+            (coeff_a, A),
+            (-Scalar::one(), B),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute point coordinates
-        let new_x = composer.mul(
-            E,
-            F,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_y = composer.mul(
-            G,
-            H,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_z = composer.mul(
-            F,
-            G,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        let new_t = composer.mul(
-            E,
-            H,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let new_x = composer.mul(Scalar::one(), E, F, Scalar::zero(), Scalar::zero());
+        let new_y = composer.mul(Scalar::one(), G, H, Scalar::zero(), Scalar::zero());
+        let new_z = composer.mul(Scalar::one(), F, G, Scalar::zero(), Scalar::zero());
+        let new_t = composer.mul(Scalar::one(), E, H, Scalar::zero(), Scalar::zero());
 
         JubJubPointGadget {
             X: new_x.into(),
@@ -361,56 +240,46 @@ impl JubJubPointGadget {
     pub fn equal(&self, composer: &mut Bls12_381Composer, other: &JubJubPointGadget) {
         // First assigment
         let a = composer.mul(
+            Scalar::one(),
             self.X,
             other.Z,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         let b = composer.mul(
+            Scalar::one(),
             other.X,
             self.Z,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Constraint a - b == 0
         let a_min_b = composer.add(
-            a.into(),
-            b.into(),
-            -Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (-Scalar::one(), a.into()),
+            (Scalar::one(), b.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
         composer.constrain_to_constant(a_min_b, Scalar::zero(), Scalar::zero());
         // Second assigment
         let c = composer.mul(
+            Scalar::one(),
             self.Y,
             other.Z,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         let d = composer.mul(
+            Scalar::one(),
             other.Y,
             self.Z,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Constraint c - d == 0
         let c_min_d = composer.add(
-            c,
-            d,
-            Scalar::one(),
-            -Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), c),
+            (-Scalar::one(), d),
             Scalar::zero(),
             Scalar::zero(),
         );
@@ -425,96 +294,56 @@ impl JubJubPointGadget {
         let coeff_d = JubJubParameters::COEFF_D;
 
         // Compute a * X²
-        let a_x_sq = composer.mul(
-            self.X,
-            self.X,
-            coeff_a,
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let a_x_sq = composer.mul(coeff_a, self.X, self.X, Scalar::zero(), Scalar::zero());
         // Compute Y²
         let y_sq = composer.mul(
-            self.Y,
-            self.Y,
             Scalar::one(),
-            -Scalar::one(),
+            self.Y,
+            self.Y,
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute a*X² + Y²
         let a_xsq_ysq = composer.add(
-            a_x_sq,
-            y_sq,
-            Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), a_x_sq),
+            (Scalar::one(), y_sq),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute Z²
         let z_sq = composer.mul(
-            self.Z,
-            self.Z,
             Scalar::one(),
-            -Scalar::one(),
+            self.Z,
+            self.Z,
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute left assigment
         let left_assig = composer.mul(
+            Scalar::one(),
             a_xsq_ysq,
             z_sq,
-            Scalar::one(),
-            -Scalar::one(),
             Scalar::zero(),
             Scalar::zero(),
         );
 
         // Compute Z⁴
-        let z_sq_sq = composer.mul(
-            z_sq,
-            z_sq,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let z_sq_sq = composer.mul(Scalar::one(), z_sq, z_sq, Scalar::zero(), Scalar::zero());
         // Compute d * X²
-        let d_x_sq = composer.mul(
-            self.X,
-            self.X,
-            coeff_d,
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let d_x_sq = composer.mul(coeff_d, self.X, self.X, Scalar::zero(), Scalar::zero());
         // Compute d*(X²) * Y²
-        let d_x_sq_y_sq = composer.mul(
-            d_x_sq,
-            y_sq,
-            Scalar::one(),
-            -Scalar::one(),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
+        let d_x_sq_y_sq = composer.mul(Scalar::one(), d_x_sq, y_sq, Scalar::zero(), Scalar::zero());
         // Compute right assigment
         let right_assig = composer.add(
-            z_sq_sq.into(),
-            d_x_sq_y_sq.into(),
-            Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (Scalar::one(), z_sq_sq.into()),
+            (Scalar::one(), d_x_sq_y_sq.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Constrain right_assig = left_assig
         let should_be_zero = composer.add(
-            left_assig.into(),
-            right_assig.into(),
-            -Scalar::one(),
-            Scalar::one(),
-            -Scalar::one(),
+            (-Scalar::one(), left_assig.into()),
+            (Scalar::one(), right_assig.into()),
             Scalar::zero(),
             Scalar::zero(),
         );
