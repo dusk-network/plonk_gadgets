@@ -592,7 +592,7 @@ mod tests {
     use dusk_plonk::commitment_scheme::kzg10::{ProverKey, VerifierKey};
     use dusk_plonk::fft::EvaluationDomain;
     use dusk_plonk::proof_system::Proof;
-    use jubjub::{Fq, Fr};
+    use jubjub::Fr;
     use jubjub::{JubJubAffine, JubJubParameters, JubJubProjective};
     use merlin::Transcript;
 
@@ -669,7 +669,7 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
@@ -698,7 +698,7 @@ mod tests {
         ck: &ProverKey,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
-        selector: &Fq,
+        selector: &Scalar,
     ) -> Proof {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -724,7 +724,7 @@ mod tests {
         proof: &Proof,
         P1: &JubJubProjective,
         P2: &JubJubProjective,
-        selector: &Fq,
+        selector: &Scalar,
     ) -> bool {
         let mut transcript = gen_transcript();
         let mut composer = StandardComposer::new();
@@ -744,14 +744,14 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
     fn conditionally_select_identity_roundtrip_helper(
         P1: &JubJubProjective,
         P2: &JubJubProjective,
-        selector: &Fq,
+        selector: &Scalar,
     ) -> bool {
         let public_parameters = PublicParameters::setup(512, &mut rand::thread_rng()).unwrap();
         let (ck, vk) = public_parameters.trim(512).unwrap();
@@ -833,7 +833,7 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
@@ -906,7 +906,7 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
@@ -966,7 +966,7 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
@@ -1003,7 +1003,7 @@ mod tests {
         // Gen BoolVars for the scalar
         let bits = scalar_bits
             .iter()
-            .map(|bit| composer.add_input(Fq::from(*bit)))
+            .map(|bit| composer.add_input(Scalar::from(*bit as u64)))
             .collect::<Vec<Variable>>();
         let bits = bits
             .iter()
@@ -1037,7 +1037,7 @@ mod tests {
         // Gen BoolVars for the scalar
         let bits = scalar_bits
             .iter()
-            .map(|bit| composer.add_input(Fq::from(*bit)))
+            .map(|bit| composer.add_input(Scalar::from(*bit as u64)))
             .collect::<Vec<Variable>>();
         let bits = bits
             .iter()
@@ -1055,7 +1055,7 @@ mod tests {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 

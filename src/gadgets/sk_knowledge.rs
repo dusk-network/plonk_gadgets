@@ -4,8 +4,8 @@ use crate::gadgets::scalar;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::composer::StandardComposer;
 use dusk_plonk::constraint_system::Variable;
+use jubjub::Fr;
 use jubjub::JubJubProjective;
-use jubjub::{Fq, Fr};
 
 pub fn sk_knowledge(
     composer: &mut StandardComposer,
@@ -48,12 +48,11 @@ fn is_even(bit: u8) -> bool {
 }
 /// Turn Scalar into bits
 fn scalar_to_bits(scalar: &Fr) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    scalar.write(&mut bytes).unwrap();
+    let bytes = scalar.to_bytes();
     // Compute bit-array
     let mut j = 0;
     let mut res = [0u8; 256];
-    for byte in bytes {
+    for byte in &bytes {
         for i in 0..8 {
             let bit = byte >> i as u8;
             res[j] = !is_even(bit) as u8;
@@ -146,7 +145,7 @@ mod test {
             &preprocessed_circuit,
             &mut transcript,
             vk,
-            &vec![Fq::zero()],
+            &[Scalar::zero(); 1],
         )
     }
 
