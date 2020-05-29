@@ -2,9 +2,9 @@ use crate::gadgets::boolean::BoolVar;
 use algebra::curves::bls12_381::Bls12_381;
 use algebra::fields::bls12_381::fr::Fr;
 use algebra::fields::PrimeField;
+use dusk_plonk::constraint_system::composer::StandardComposer;
+use dusk_plonk::constraint_system::constraint_system::Variable;
 use num_traits::{One, Zero};
-use dusk_plonk::cs::composer::StandardComposer;
-use dusk_plonk::cs::constraint_system::Variable;
 use rand::RngCore;
 
 /// Conditionally selects the value provided or a zero instead.
@@ -14,7 +14,7 @@ use rand::RngCore;
 /// x' = x if select = 1
 /// x' = 0 if select = 0
 pub fn conditionally_select_zero(
-    composer: &mut StandardComposer<Bls12_381>,
+    composer: &mut StandardComposer,
     x: Variable,
     select: Variable,
 ) -> Variable {
@@ -29,7 +29,7 @@ pub fn conditionally_select_zero(
 /// y' = 1 if bit = 0 =>
 /// y' = bit * y + (1 - bit)
 pub fn conditionally_select_one(
-    composer: &mut StandardComposer<Bls12_381>,
+    composer: &mut StandardComposer,
     y: Variable,
     select: BoolVar,
 ) -> Variable {
@@ -66,11 +66,7 @@ pub fn conditionally_select_one(
 }
 
 /// Adds constraints to the CS which check that a Variable != 0
-pub fn is_non_zero(
-    composer: &mut StandardComposer<Bls12_381>,
-    var: Variable,
-    var_assigment: Option<Fr>,
-) {
+pub fn is_non_zero(composer: &mut StandardComposer, var: Variable, var_assigment: Option<Fr>) {
     let one = composer.add_input(Fr::one());
     // XXX: We use this Fq random obtention but we will use the random variable generator
     // that we will include in the PLONK API on the future.
@@ -97,18 +93,18 @@ pub fn is_non_zero(
 /// Constraints a `LinearCombination` to be equal to zero or one with:
 /// `(1 - a) * a = 0` returning a `BoolVar` that preserves
 /// the original Variable value.
-pub fn binary_constrain(composer: &mut StandardComposer<Bls12_381>, bit: Variable) -> BoolVar {
+pub fn binary_constrain(composer: &mut StandardComposer, bit: Variable) -> BoolVar {
     composer.bool_gate(bit);
     BoolVar(bit)
 }
 
 mod tests {
     use super::*;
+    use dusk_plonk::constraint_system::proof::Proof;
+    use dusk_plonk::constraint_system::Composer;
+    use dusk_plonk::srs::*;
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use dusk_plonk::cs::proof::Proof;
-    use dusk_plonk::cs::Composer;
-    use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::str::FromStr;
 

@@ -5,10 +5,10 @@ use algebra::curves::jubjub::{JubJubParameters, JubJubProjective};
 use algebra::curves::models::TEModelParameters;
 use algebra::fields::bls12_381::Fr;
 use num_traits::{One, Zero};
-use dusk_plonk::cs::composer::StandardComposer;
-use dusk_plonk::cs::constraint_system::Variable;
+use dusk_plonk::constraint_system::composer::StandardComposer;
+use dusk_plonk::constraint_system::constraint_system::Variable;
 
-pub type Bls12_381Composer = StandardComposer<Bls12_381>;
+pub type Bls12_381Composer = StandardComposer;
 /// Represents a JubJub Point using Twisted Edwards Extended Coordinates.
 /// Each one of the coordinates is represented by a `LinearCombination<PrimeField>`
 pub struct JubJubPointGadget {
@@ -414,7 +414,7 @@ impl JubJubPointGadget {
     /// and performs an ECC scalar multiplication.
     pub fn scalar_mul(
         &self,
-        composer: &mut StandardComposer<Bls12_381>,
+        composer: &mut StandardComposer,
         scalar: &[BoolVar],
     ) -> JubJubPointGadget {
         let zero = composer.add_input(Fr::zero());
@@ -482,7 +482,7 @@ mod tests {
     use algebra::fields::jubjub::{fq::Fq, fr::Fr};
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
-    use dusk_plonk::cs::{proof::Proof, Composer};
+    use dusk_plonk::constraint_system::{proof::Proof, Composer};
     use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::ops::{Add, Mul};

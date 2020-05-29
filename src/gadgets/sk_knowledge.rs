@@ -1,17 +1,17 @@
 use crate::gadgets::boolean::BoolVar;
 use crate::gadgets::ecc::*;
 use crate::gadgets::scalar;
-use algebra::curves::bls12_381::Bls12_381;
-use algebra::curves::jubjub::JubJubProjective;
-use algebra::fields::jubjub::{fq::Fq, fr::Fr};
 use algebra::fields::PrimeField;
 use algebra::ToBytes;
-use dusk_plonk::cs::composer::StandardComposer;
-use dusk_plonk::cs::constraint_system::Variable;
+use bls12_381::Bls12_381;
+use dusk_plonk::constraint_system::composer::StandardComposer;
+use dusk_plonk::constraint_system::Variable;
+use jubjub::JubJubProjective;
+use jubjub::{fq::Fq, fr::Fr};
 use rand::{thread_rng, RngCore};
 
 pub fn sk_knowledge(
-    composer: &mut StandardComposer<Bls12_381>,
+    composer: &mut StandardComposer,
     basepoint: &JubJubPointGadget,
     pub_key: &JubJubPointGadget,
     scalar: Option<Fr>,
@@ -70,11 +70,11 @@ mod test {
     use super::*;
     use algebra::curves::jubjub::{JubJubAffine, JubJubParameters};
     use algebra::curves::models::TEModelParameters;
+    use dusk_plonk::constraint_system::{proof::Proof, Composer};
+    use dusk_plonk::srs::*;
     use ff_fft::EvaluationDomain;
     use merlin::Transcript;
     use num_traits::identities::{One, Zero};
-    use dusk_plonk::cs::{proof::Proof, Composer};
-    use dusk_plonk::srs::*;
     use poly_commit::kzg10::{Powers, UniversalParams, VerifierKey};
     use std::ops::{Add, Mul};
 
