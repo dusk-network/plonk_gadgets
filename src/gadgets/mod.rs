@@ -1,4 +1,3 @@
-pub mod boolean;
-pub mod ecc;
+mod errors;
+pub(crate) use errors::GadgetErrors;
 pub mod scalar;
-pub mod sk_knowledge;
