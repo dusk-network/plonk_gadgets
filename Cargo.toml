@@ -6,12 +6,9 @@ edition = "2018"
 
 
 [dependencies]
-num-traits = "0.2"
-plonk = { git = "https://github.com/dusk-network/plonk", branch = "fast_prover_zexe" }
-algebra = { git = "https://github.com/scipr-lab/zexe/", features = [ "parallel" ] }
-ff-fft = { git = "https://github.com/scipr-lab/zexe/" }
-poly-commit = { git = "https://github.com/scipr-lab/poly-commit", branch = "master" }
-merlin = "2.0"
+dusk-plonk = "0.2.6"
+anyhow = "1.0.32"
+thiserror = "1.0.20"
 # rand is added until we don't expose a method in plonk that allows the verifier 
 # creating random Variables.
 rand = "0.7.0"
