@@ -211,4 +211,63 @@ mod tests {
         // value as a result.
         assert!(verifier.verify(&proof, &vk, &pi).is_ok());
     }
+
+    #[test]
+    fn test_is_not_zero() {
+        // The circuit closure runs the is_not_zero fn and constraints the input to
+        // not be zero.
+        let circuit = |composer: &mut StandardComposer,
+                       value: BlsScalar,
+                       value_assigned: BlsScalar|
+         -> Result<(), Error> {
+            let value = composer.add_input(value);
+            is_non_zero(composer, value, value_assigned)
+        };
+
+        // Generate Composer & Public Parameters
+        let pub_params =
+            PublicParameters::setup(1 << 8, &mut rand::thread_rng()).expect("Unexpected error");
+        let (ck, vk) = pub_params.trim(1 << 7).expect("Unexpected error");
+
+        // Value  & Value assigned set to 0 should err
+        // Proving
+        let mut prover = Prover::new(b"testing");
+        assert!(circuit(prover.mut_cs(), BlsScalar::zero(), BlsScalar::zero()).is_err());
+        prover.clear_witness();
+
+        // Value and value_assigned with different values should fail on verification.
+        // Proving
+        let mut prover = Prover::new(b"testing");
+        assert!(circuit(
+            prover.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::random(&mut rand::thread_rng()),
+        )
+        .is_ok());
+        let mut pi = prover.mut_cs().public_inputs.clone();
+        prover.preprocess(&ck).expect("Error on preprocessing");
+        let proof = prover.prove(&ck).expect("Error on proving");
+
+        // Verification
+        let mut verifier = Verifier::new(b"testing");
+        circuit(
+            verifier.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::random(&mut rand::thread_rng()),
+        )
+        .expect("Error on gadget run");
+        verifier.preprocess(&ck).expect("Error on preprocessing");
+        assert!(verifier.verify(&proof, &vk, &pi).is_err());
+
+        // Value & value assigned set correctly and != 0. This should pass.
+        // Proving
+        prover.clear_witness();
+        let rand = BlsScalar::random(&mut rand::thread_rng());
+        circuit(prover.mut_cs(), rand, rand).expect("Error on gadget run");
+        pi = prover.mut_cs().public_inputs.clone();
+        let proof = prover.prove(&ck).expect("Error on proving");
+        // This should pass since we sent 1 as selector and the circuit closure should assign the randomly-generated
+        // value as a result.
+        assert!(verifier.verify(&proof, &vk, &pi).is_ok());
+    }
 }
