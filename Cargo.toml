@@ -9,6 +9,6 @@ edition = "2018"
 dusk-plonk = "0.2.6"
 anyhow = "1.0.32"
 thiserror = "1.0.20"
-# rand is added until we don't expose a method in plonk that allows the verifier 
-# creating random Variables.
-rand = "0.7.0"
+
+[dev-dependencies]
+rand = "0.7.3"

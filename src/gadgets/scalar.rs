@@ -27,35 +27,35 @@ pub fn conditionally_select_zero(
 /// NOTE that the `select` input has to be previously constrained to
 /// be either `one` or `zero`.
 /// ## Performs:
-/// y' = y if bit = 1
-/// y' = 1 if bit = 0 =>
-/// y' = bit * y + (1 - bit)
+/// y' = y if selector = 1
+/// y' = 1 if selector = 0 =>
+/// y' = selector * y + (1 - selector)
 pub fn conditionally_select_one(
     composer: &mut StandardComposer,
     y: Variable,
-    select: Variable,
+    selector: Variable,
 ) -> Variable {
     let one = composer.add_constant_witness(BlsScalar::one());
-    // bit * y
-    let bit_y = composer.mul(
+    // selector * y
+    let selector_y = composer.mul(
         BlsScalar::one(),
         y,
-        select,
+        selector,
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
-    // 1 - bit
-    let one_min_bit = composer.add(
+    // 1 - selector
+    let one_min_selector = composer.add(
         (BlsScalar::one(), one),
-        (-BlsScalar::one(), select),
+        (-BlsScalar::one(), selector),
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
 
-    // bit * y + (1 - bit)
+    // selector * y + (1 - selector)
     composer.add(
-        (BlsScalar::one(), bit_y),
-        (BlsScalar::one(), one_min_bit),
+        (BlsScalar::one(), selector_y),
+        (BlsScalar::one(), one_min_selector),
         BlsScalar::zero(),
         BlsScalar::zero(),
     )
@@ -73,7 +73,7 @@ pub fn is_non_zero(
     // Constrain `var` to actually be equal to the `var_assigment` provided.
     composer.assert_equal(var, var_assigned);
     // Compute the inverse of `value_assigned`.
-    let mut inverse = value_assigned.invert();
+    let inverse = value_assigned.invert();
     let inv: Variable;
     if inverse.is_some().unwrap_u8() == 1u8 {
         // Safe to unwrap here.
@@ -101,4 +101,114 @@ pub fn is_non_zero(
 
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_conditionally_select_0() {
+        // The circuit closure runs the conditionally_select_zero fn and constraints the result
+        // to actually be 0
+        let circuit = |composer: &mut StandardComposer, value: BlsScalar, selector: BlsScalar| {
+            let value = composer.add_input(value);
+            let selector = composer.add_input(selector);
+            let res = conditionally_select_zero(composer, value, selector);
+            composer.constrain_to_constant(res, BlsScalar::zero(), BlsScalar::zero());
+        };
+
+        // Generate Composer & Public Parameters
+        let pub_params =
+            PublicParameters::setup(1 << 8, &mut rand::thread_rng()).expect("Unexpected error");
+        let (ck, vk) = pub_params.trim(1 << 7).expect("Unexpected error");
+
+        // Selector set to 0 should select 0
+        // Proving
+        let mut prover = Prover::new(b"testing");
+        circuit(
+            prover.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::zero(),
+        );
+        prover.preprocess(&ck).expect("Error on preprocessing");
+        let proof = prover.prove(&ck).expect("Error on proving");
+
+        // Verification
+        let mut verifier = Verifier::new(b"testing");
+        circuit(
+            verifier.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::zero(),
+        );
+        verifier.preprocess(&ck).expect("Error on preprocessing");
+        // This should pass since we sent 0 as selector and the circuit closure is constraining the
+        // result to be equal to 0.
+        assert!(verifier.verify(&proof, &vk, &[BlsScalar::zero()]).is_ok());
+
+        // Selector set to 1 shouldn't assign 0.
+        // Proving
+        prover.clear_witness();
+        circuit(
+            prover.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::one(),
+        );
+        let proof = prover.prove(&ck).expect("Error on proving");
+        // This shouldn't pass since we sent 1 as selector and the circuit closure is constraining the
+        // result to be equal to 0 while the value assigned is indeed the randomly generated one.
+        assert!(verifier.verify(&proof, &vk, &[BlsScalar::zero()]).is_err());
+    }
+
+    #[test]
+    fn test_conditionally_select_1() {
+        // The circuit closure runs the conditionally_select_one fn and constraints the result
+        // to actually to be equal to the provided expected_result.
+        let circuit = |composer: &mut StandardComposer,
+                       value: BlsScalar,
+                       selector: BlsScalar,
+                       expected_result: BlsScalar| {
+            let value = composer.add_input(value);
+            let selector = composer.add_input(selector);
+            let res = conditionally_select_one(composer, value, selector);
+            composer.constrain_to_constant(res, BlsScalar::zero(), -expected_result);
+        };
+
+        // Generate Composer & Public Parameters
+        let pub_params =
+            PublicParameters::setup(1 << 8, &mut rand::thread_rng()).expect("Unexpected error");
+        let (ck, vk) = pub_params.trim(1 << 7).expect("Unexpected error");
+
+        // Selector set to 0 should asign 1
+        // Proving
+        let mut prover = Prover::new(b"testing");
+        circuit(
+            prover.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::zero(),
+            BlsScalar::one(),
+        );
+        let mut pi = prover.mut_cs().public_inputs.clone();
+        prover.preprocess(&ck).expect("Error on preprocessing");
+        let proof = prover.prove(&ck).expect("Error on proving");
+
+        // Verification
+        let mut verifier = Verifier::new(b"testing");
+        circuit(
+            verifier.mut_cs(),
+            BlsScalar::random(&mut rand::thread_rng()),
+            BlsScalar::zero(),
+            BlsScalar::one(),
+        );
+        verifier.preprocess(&ck).expect("Error on preprocessing");
+        // This should pass since we sent 0 as selector and the circuit should then return
+        // 1.
+        assert!(verifier.verify(&proof, &vk, &pi).is_ok());
+
+        // Selector set to 1 should assign the randomly-generated value.
+        // Proving
+        prover.clear_witness();
+        let rand = BlsScalar::random(&mut rand::thread_rng());
+        circuit(prover.mut_cs(), rand, BlsScalar::one(), rand);
+        pi = prover.mut_cs().public_inputs.clone();
+        let proof = prover.prove(&ck).expect("Error on proving");
+        // This should pass since we sent 1 as selector and the circuit closure should assign the randomly-generated
+        // value as a result.
+        assert!(verifier.verify(&proof, &vk, &pi).is_ok());
+    }
 }
