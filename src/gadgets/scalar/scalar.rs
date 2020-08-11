@@ -1,5 +1,5 @@
 ///! Basic `Scalar` oriented gadgets collection.
-use super::GadgetErrors;
+use crate::gadgets::GadgetErrors;
 use anyhow::{Error, Result};
 use dusk_plonk::prelude::*;
 
