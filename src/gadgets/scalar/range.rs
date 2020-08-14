@@ -1,5 +1,4 @@
 //! Collection of range-checking gadgets for Bls12_381 scalars.
-use anyhow::{Error, Result};
 use dusk_plonk::prelude::*;
 
 /// An allocated scalar holds the underlying witness assignment for the Prover
@@ -144,6 +143,7 @@ fn maybe_equal(
     let y = composer.mul(-BlsScalar::one(), z, u, BlsScalar::one(), BlsScalar::zero());
 
     // yu = 0
+{
     let a = y;
     let b = u;
     let c = u;
@@ -153,7 +153,7 @@ fn maybe_equal(
     let pi = BlsScalar::zero();
 
     composer.mul_gate(a, b, c, q_m, q_o, q_c, pi);
-
+}
     y
 }
 
@@ -174,7 +174,6 @@ fn scalar_decomposition_gadget(
         .iter()
         .map(|bit| {
             let var = composer.add_input(BlsScalar::from(*bit as u64));
-            composer.boolean_gate(var);
             var
         })
         .collect();
@@ -190,6 +189,9 @@ fn scalar_decomposition_gadget(
     };
 
     for (power, bit) in scalar_bits_var.iter().enumerate() {
+
+        composer.boolean_gate(*bit);
+
         // XXX; This can be optimised to be a third of the gate count
         let two_pow = BlsScalar::from(2).pow(&[power as u64, 0, 0, 0]);
 
@@ -346,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn max_bound_test() -> Result<(), Error> {
+    fn max_bound_test()  {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
             .expect("Pub Params generation error");
@@ -409,10 +411,9 @@ mod tests {
                 .is_ok());
         }
 
-        Ok(())
     }
     #[test]
-    fn range_check_test() -> Result<(), Error> {
+    fn range_check_test() {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
             .expect("Pub Params generation error");
@@ -494,11 +495,10 @@ mod tests {
                 .is_ok());
         }
 
-        Ok(())
     }
 
     #[test]
-    fn scalar_decomposition_test() -> Result<(), Error> {
+    fn scalar_decomposition_test() {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
             .expect("Pub Params generation error");
@@ -531,6 +531,5 @@ mod tests {
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
             .is_ok());
 
-        Ok(())
     }
 }
