@@ -13,6 +13,7 @@ pub fn single_complex_rangeproof_gadget(
     witness: BlsScalar,
     witness_var: Variable,
     max_range: BlsScalar,
+    min_range: Option<BlsScalar>,
 ) -> Result<Variable, Error> {
     // First, we need to ensure that the witnesses we got are the same.
     let scalar_witness = composer.add_input(witness);
@@ -28,24 +29,28 @@ pub fn single_complex_rangeproof_gadget(
     let closest_pow_of_two = BlsScalar::from(2u64).pow(&[num_bits, 0, 0, 0]);
     // Compute b' max range.
     let b_prime = closest_pow_of_two - max_range;
+    // Assing the minimum range to `a` when specified and zero otherways.
+    let a = min_range.unwrap_or(BlsScalar::zero());
     // Obtain 256-bit representation of `witness + b'`.
-    let bits = scalar_to_bits(&(witness + b_prime));
-
-    let mut var_accumulator = zero;
-
-    // Compute the sum of the bit representation of `witness + b_prime` inside and outside
+    let bits_witness_plus_bprime = scalar_to_bits(&(witness + b_prime));
+    // Obtain 256-bit representation of `witness -a `.
+    let bits_witness_min_a = scalar_to_bits(&(witness - a));
+    let mut witness_plus_b_prime_accumulator = zero;
+    let mut witness_min_a_accumulator = zero;
+    // Compute the sum of the bit representation of `witness - a` inside and outside
     // of the circuit.
     //
-    // Effectively, we're doing the following: `Sum_i(v_i * 2^(i-1))`.
-    let accumulator = bits[..=num_bits as usize].iter().enumerate().fold(
-        BlsScalar::zero(),
-        |scalar_accum, (idx, bit)| {
+    // Effectively, we're doing the following: `Sum_i(w_i * 2^(i-1))`.
+    let _accumulator_witness_min_a = bits_witness_min_a[..=num_bits as usize]
+        .iter()
+        .enumerate()
+        .fold(BlsScalar::zero(), |scalar_accum, (idx, bit)| {
             let bit_var = composer.add_input(BlsScalar::from(*bit as u64));
             // Apply boolean constraint to the bit.
             composer.boolean_gate(bit_var);
             // Accumulate the sum of bits multiplied by the corresponding 2^(i-1) as a `Variable`
-            var_accumulator = composer.add(
-                (BlsScalar::one(), var_accumulator),
+            witness_min_a_accumulator = composer.add(
+                (BlsScalar::one(), witness_min_a_accumulator),
                 (BlsScalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
                 BlsScalar::zero(),
                 BlsScalar::zero(),
@@ -53,16 +58,45 @@ pub fn single_complex_rangeproof_gadget(
             // Accumulate the sum of bits multiplied by the corresponding 2^(i-1) as a `Scalar`
             scalar_accum
                 + (BlsScalar::from(*bit as u64) * BlsScalar::from(2u64).pow(&[idx as u64, 0, 0, 0]))
-        },
+        });
+    // Constrain : `Sum(wi * 2^(i-1)) - (witness - a).`
+    let witness_min_a = composer.add(
+        (BlsScalar::one(), witness_var),
+        (-a, zero),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
     );
+    composer.assert_equal(witness_min_a, witness_min_a_accumulator);
+    // Compute the sum of the bit representation of `witness + b_prime` inside and outside
+    // of the circuit.
+    //
+    // Effectively, we're doing the following: `Sum_i(v_i * 2^(i-1))`.
+    let accumulator_witness_plus_b_prime = bits_witness_plus_bprime[..=num_bits as usize]
+        .iter()
+        .enumerate()
+        .fold(BlsScalar::zero(), |scalar_accum, (idx, bit)| {
+            let bit_var = composer.add_input(BlsScalar::from(*bit as u64));
+            // Apply boolean constraint to the bit.
+            composer.boolean_gate(bit_var);
+            // Accumulate the sum of bits_witness_plus_bprime multiplied by the corresponding 2^(i-1) as a `Variable`
+            witness_plus_b_prime_accumulator = composer.add(
+                (BlsScalar::one(), witness_plus_b_prime_accumulator),
+                (BlsScalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
+                BlsScalar::zero(),
+                BlsScalar::zero(),
+            );
+            // Accumulate the sum of bits_witness_plus_bprime multiplied by the corresponding 2^(i-1) as a `Scalar`
+            scalar_accum
+                + (BlsScalar::from(*bit as u64) * BlsScalar::from(2u64).pow(&[idx as u64, 0, 0, 0]))
+        });
     // Compute `Chi(x)` =  Sum(vi * 2^(i-1)) - (witness + b').
     // Note that the result will be equal to: `0 (if the reangeproof holds)
     // or any other value if it doesn't.
     dbg!(witness);
     dbg!(b_prime);
-    dbg!(accumulator);
+    dbg!(accumulator_witness_plus_b_prime);
     dbg!(witness + b_prime);
-    dbg!(witness + b_prime - accumulator);
+    dbg!(witness + b_prime - accumulator_witness_plus_b_prime);
     let witness_plus_b_prime = composer.add(
         (BlsScalar::one(), witness_var),
         (BlsScalar::from(b_prime), one),
@@ -71,7 +105,7 @@ pub fn single_complex_rangeproof_gadget(
     );
     let chi_x_var = composer.add(
         (BlsScalar::one(), witness_plus_b_prime),
-        (-BlsScalar::one(), var_accumulator),
+        (-BlsScalar::one(), witness_plus_b_prime_accumulator),
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
@@ -82,10 +116,10 @@ pub fn single_complex_rangeproof_gadget(
     // We introduce new variables `u, y, z` that are computed as follows:
 
     // `u = witness + b_prime - accumulator` which should equal `chi_x`.
-    let u = witness + b_prime - accumulator;
+    let u = witness + b_prime - accumulator_witness_plus_b_prime;
     let u_var = composer.big_add(
         (BlsScalar::one(), witness_var),
-        (-BlsScalar::one(), var_accumulator),
+        (-BlsScalar::one(), witness_plus_b_prime_accumulator),
         None,
         b_prime,
         BlsScalar::zero(),
@@ -170,7 +204,13 @@ fn complete_complex_rangeproof_gadget(
     );
     let new_upper_bound = max_range - min_range;
     dbg!(new_witness, new_upper_bound);
-    single_complex_rangeproof_gadget(composer, new_witness, new_witness_var, new_upper_bound)
+    single_complex_rangeproof_gadget(
+        composer,
+        new_witness,
+        new_witness_var,
+        new_upper_bound,
+        Some(min_range),
+    )
 }
 
 // Decompose a `BlsScalar` into its 256-bit representation.
@@ -223,7 +263,8 @@ mod tests {
                                          witness: BlsScalar|
          -> Result<(), Error> {
             let witness_var = composer.add_input(witness);
-            let res = single_complex_rangeproof_gadget(composer, witness, witness_var, range)?;
+            let res =
+                single_complex_rangeproof_gadget(composer, witness, witness_var, range, None)?;
             // Constraint res to be true, since the range should hold.
             composer.constrain_to_constant(res, BlsScalar::one(), BlsScalar::zero());
             Ok(())
