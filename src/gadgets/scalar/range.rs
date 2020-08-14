@@ -62,7 +62,7 @@ pub fn single_complex_rangeproof_gadget(
     // Constrain : `Sum(wi * 2^(i-1)) - (witness - a).`
     let witness_min_a = composer.add(
         (BlsScalar::one(), witness_var),
-        (-a, zero),
+        (-a, one),
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
