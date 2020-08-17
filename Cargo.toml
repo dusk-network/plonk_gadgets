@@ -6,7 +6,7 @@ edition = "2018"
 
 
 [dependencies]
-dusk-plonk = "0.2.6"
+dusk-plonk = "0.2.7"
 anyhow = "1.0.32"
 thiserror = "1.0.20"
 
