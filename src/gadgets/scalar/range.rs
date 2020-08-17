@@ -19,9 +19,9 @@ pub fn single_complex_rangeproof_gadget(
     composer.assert_equal(witness_var, scalar_witness);
 
     // Create constant witness one
-    let one = composer.add_constant_witness(BlsScalar::one());
+    let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     // Create 0 as witness value
-    let zero = composer.add_constant_witness(BlsScalar::zero());
+    let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
     // Compute number of bits needed to represent the maximum range
     let num_bits = bits_count(max_range);
     // Compute the closest power of two knowing the bits needed to represent the max range.
@@ -183,7 +183,7 @@ fn complete_complex_rangeproof_gadget(
     min_range: BlsScalar,
     max_range: BlsScalar,
 ) -> Result<Variable, Error> {
-    let one = composer.add_constant_witness(BlsScalar::one());
+    let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     // The goal is to convert a double bound check into a single one.
     // We can achive that by doing the following:
     // 1. Witness = Witness - min_range

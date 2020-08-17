@@ -35,7 +35,7 @@ pub fn conditionally_select_one(
     y: Variable,
     selector: Variable,
 ) -> Variable {
-    let one = composer.add_constant_witness(BlsScalar::one());
+    let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     // selector * y
     let selector_y = composer.mul(
         BlsScalar::one(),
@@ -83,7 +83,7 @@ pub fn is_non_zero(
     }
 
     // Var * Inv(Var) = 1
-    let one = composer.add_constant_witness(BlsScalar::one());
+    let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     composer.poly_gate(
         var,
         inv,
