@@ -1,6 +1,6 @@
 [package]
 name = "plonk_gadgets"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["CPerezz <c.perezbaro@gmail.com>", "Victor Lopez <vhrlopes@gmail.com>"]
 edition = "2018"
 
