@@ -1,2 +1,2 @@
-pub(crate) mod range;
-pub(crate) mod scalar;
+pub mod range;
+pub mod scalar;

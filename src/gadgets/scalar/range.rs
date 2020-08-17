@@ -176,7 +176,7 @@ pub fn single_complex_rangeproof_gadget(
 ///
 /// Checks that `min_range <= witness < max_range` returning a boolean `Variable` as a result
 /// where `1 = holds` and `0 = Does not hold`.
-fn complete_complex_rangeproof_gadget(
+pub fn complete_complex_rangeproof_gadget(
     composer: &mut StandardComposer,
     witness: BlsScalar,
     witness_var: Variable,
