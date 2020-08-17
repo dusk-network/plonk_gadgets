@@ -6,7 +6,7 @@ use dusk_plonk::prelude::*;
 /// Builds a complex range-proof (not bounded to a pow_of_two) given a
 /// composer, the max range and the witness.
 ///
-/// Checks that `witness < max_range` returning a boolean `Variable` as a result
+/// Checks that `witness <= max_range` returning a boolean `Variable` as a result
 /// where `1 = holds` and `0 = Does not hold`.
 pub fn single_complex_rangeproof_gadget(
     composer: &mut StandardComposer,
@@ -174,7 +174,7 @@ pub fn single_complex_rangeproof_gadget(
 /// Builds a complex range-proof (not bounded to powers_of_two) given a
 /// composer, the max range, the min_range and the witness.
 ///
-/// Checks that `min_range < witness < max_range` returning a boolean `Variable` as a result
+/// Checks that `min_range <= witness < max_range` returning a boolean `Variable` as a result
 /// where `1 = holds` and `0 = Does not hold`.
 fn complete_complex_rangeproof_gadget(
     composer: &mut StandardComposer,
