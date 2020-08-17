@@ -184,7 +184,7 @@ fn scalar_decomposition_gadget(
     // Now ensure that the bits correctly accumulate to the witness given
     // XXX: Expose a method called .zero() on composer
     let mut accumulator = AllocatedScalar {
-        var: composer.add_constant_witness(BlsScalar::zero()),
+        var: composer.add_witness_to_circuit_description(BlsScalar::zero()),
         scalar: BlsScalar::zero(),
     };
 
