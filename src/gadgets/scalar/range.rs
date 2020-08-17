@@ -13,7 +13,6 @@ pub fn single_complex_rangeproof_gadget(
     witness: BlsScalar,
     witness_var: Variable,
     max_range: BlsScalar,
-    min_range: Option<BlsScalar>,
 ) -> Result<Variable, Error> {
     // First, we need to ensure that the witnesses we got are the same.
     let scalar_witness = composer.add_input(witness);
@@ -30,7 +29,7 @@ pub fn single_complex_rangeproof_gadget(
     // Compute b' max range.
     let b_prime = closest_pow_of_two - max_range;
     // Assing the minimum range to `a` when specified and zero otherways.
-    let a = min_range.unwrap_or(BlsScalar::zero());
+    let a = BlsScalar::zero();
     // Obtain 256-bit representation of `witness + b'`.
     let bits_witness_plus_bprime = scalar_to_bits(&(witness + b_prime));
     // Obtain 256-bit representation of `witness -a `.
@@ -41,7 +40,7 @@ pub fn single_complex_rangeproof_gadget(
     // of the circuit.
     //
     // Effectively, we're doing the following: `Sum_i(w_i * 2^(i-1))`.
-    let _accumulator_witness_min_a = bits_witness_min_a[..=num_bits as usize]
+    let _accumulator_witness_min_a = bits_witness_min_a[..num_bits as usize]
         .iter()
         .enumerate()
         .fold(BlsScalar::zero(), |scalar_accum, (idx, bit)| {
@@ -67,15 +66,12 @@ pub fn single_complex_rangeproof_gadget(
         BlsScalar::zero(),
     );
     composer.assert_equal(witness_min_a, witness_min_a_accumulator);
-    dbg!(a);
-    dbg!(_accumulator_witness_min_a);
-    dbg!(witness - a);
-    dbg!(witness - a + _accumulator_witness_min_a);
+
     // Compute the sum of the bit representation of `witness + b_prime` inside and outside
     // of the circuit.
     //
     // Effectively, we're doing the following: `Sum_i(v_i * 2^(i-1))`.
-    let accumulator_witness_plus_b_prime = bits_witness_plus_bprime[..=num_bits as usize]
+    let accumulator_witness_plus_b_prime = bits_witness_plus_bprime[..num_bits as usize]
         .iter()
         .enumerate()
         .fold(BlsScalar::zero(), |scalar_accum, (idx, bit)| {
@@ -96,11 +92,6 @@ pub fn single_complex_rangeproof_gadget(
     // Compute `Chi(x)` =  Sum(vi * 2^(i-1)) - (witness + b').
     // Note that the result will be equal to: `0 (if the reangeproof holds)
     // or any other value if it doesn't.
-    dbg!(witness);
-    dbg!(b_prime);
-    dbg!(accumulator_witness_plus_b_prime);
-    dbg!(witness + b_prime);
-    dbg!(witness + b_prime - accumulator_witness_plus_b_prime);
     let witness_plus_b_prime = composer.add(
         (BlsScalar::one(), witness_var),
         (BlsScalar::from(b_prime), one),
@@ -207,14 +198,7 @@ fn complete_complex_rangeproof_gadget(
         BlsScalar::zero(),
     );
     let new_upper_bound = max_range - min_range;
-    dbg!(new_witness, new_upper_bound);
-    single_complex_rangeproof_gadget(
-        composer,
-        new_witness,
-        new_witness_var,
-        new_upper_bound,
-        Some(min_range),
-    )
+    single_complex_rangeproof_gadget(composer, new_witness, new_witness_var, new_upper_bound)
 }
 
 // Decompose a `BlsScalar` into its 256-bit representation.
@@ -267,8 +251,7 @@ mod tests {
                                          witness: BlsScalar|
          -> Result<(), Error> {
             let witness_var = composer.add_input(witness);
-            let res =
-                single_complex_rangeproof_gadget(composer, witness, witness_var, range, None)?;
+            let res = single_complex_rangeproof_gadget(composer, witness, witness_var, range)?;
             // Constraint res to be true, since the range should hold.
             composer.constrain_to_constant(res, BlsScalar::one(), BlsScalar::zero());
             Ok(())
@@ -363,14 +346,14 @@ mod tests {
         // 1st case to test should pass since the value is in the range.
         // Proving
         let mut prover = Prover::new(b"testing");
-        /*complex_rangeproof_gadget(
+        complex_rangeproof_gadget(
             prover.mut_cs(),
             BlsScalar::from(50_000u64),
             BlsScalar::from(250_000u64),
             BlsScalar::from(50_001u64),
-        )?;*/
+        )?;
         prover.preprocess(&ck).expect("Unexpected proving error");
-        //let proof = prover.prove(&ck).expect("Unexpected proving error");
+        let proof = prover.prove(&ck).expect("Unexpected proving error");
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
@@ -378,12 +361,12 @@ mod tests {
             verifier.mut_cs(),
             BlsScalar::from(50_000u64),
             BlsScalar::from(250_000u64),
-            BlsScalar::from(50_001u64),
+            BlsScalar::from(49_999u64),
         )?;
         verifier.preprocess(&ck).expect("Preprocessing error");
-        /*assert!(verifier
-        .verify(&proof, &vk, &vec![BlsScalar::zero()])
-        .is_ok());*/
+        assert!(verifier
+            .verify(&proof, &vk, &vec![BlsScalar::zero()])
+            .is_ok());
         // ---------------------------------------------------------
         // 2nd case should fail since we are below the minimum_range
         prover.clear_witness();
@@ -391,7 +374,7 @@ mod tests {
             prover.mut_cs(),
             BlsScalar::from(50_000u64),
             BlsScalar::from(250_000u64),
-            BlsScalar::from(50_001u64),
+            BlsScalar::from(49_999u64),
         )?;
         let proof = prover.prove(&ck).expect("Unexpected proving error");
         // Verification
@@ -401,7 +384,7 @@ mod tests {
 
         // ---------------------------------------------------------
         // 3rd case should fail since we are avobe the maximum_range
-        /*prover.clear_witness();
+        prover.clear_witness();
         complex_rangeproof_gadget(
             prover.mut_cs(),
             BlsScalar::from(50_000u64),
@@ -412,15 +395,23 @@ mod tests {
         // Verification
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
-            .is_err());*/
+            .is_err());
+
+        // ---------------------------------------------------------
+        // 4th case should fail since we are below the minimum range with
+        // a negative number.
+        prover.clear_witness();
+        complex_rangeproof_gadget(
+            prover.mut_cs(),
+            BlsScalar::from(50_000u64),
+            BlsScalar::from(250_000u64),
+            (BlsScalar::zero() - BlsScalar::one()) - BlsScalar::one(),
+        )?;
+        let proof = prover.prove(&ck).expect("Unexpected proving error");
+        // Verification
+        assert!(verifier
+            .verify(&proof, &vk, &vec![BlsScalar::zero()])
+            .is_err());
         Ok(())
     }
 }
-
-// Call previous gadget -> Variable(sk)
-
-// Let real_sk = composer.add_input(sk_as_scalar);
-// composer.assert_equals(sk, real_sk);
-// Call_gadget(sk_as_scalar);
-// Call gadget needs to return the real_sk
-// Then we constrain real_sk to the Variable(sk)
