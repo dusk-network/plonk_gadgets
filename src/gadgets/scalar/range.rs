@@ -6,13 +6,13 @@ use dusk_plonk::prelude::*;
 /// XXX: This could possibly be added to the PLONK API
 #[derive(Clone)]
 pub struct AllocatedScalar {
-    var: Variable,
-    scalar: BlsScalar,
+    pub var: Variable,
+    pub scalar: BlsScalar,
 }
 
 impl AllocatedScalar {
     /// Allocates a BlsScalar into the constraint system as a witness
-    pub(crate) fn allocate(composer: &mut StandardComposer, scalar: BlsScalar) -> AllocatedScalar {
+    pub fn allocate(composer: &mut StandardComposer, scalar: BlsScalar) -> AllocatedScalar {
         let var = composer.add_input(scalar);
         AllocatedScalar { var, scalar }
     }
