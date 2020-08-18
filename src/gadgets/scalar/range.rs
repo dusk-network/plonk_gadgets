@@ -21,11 +21,11 @@ impl AllocatedScalar {
 /// Returns a 0 or a 1, if the value lies within the specified range
 /// We do this by decomposing the scalar and showing that it can be represented in x amount of bits
 fn range_proof(composer: &mut StandardComposer, value: AllocatedScalar, num_bits: u64) -> Variable {
-    let (y, _value_bits) = scalar_decomposition_gadget(composer, num_bits as usize, value);
-    y
+    let (is_equal, _value_bits) = scalar_decomposition_gadget(composer, num_bits as usize, value);
+    is_equal
 }
 
-/// Returns a 0 or a 1, if a <= x < b
+/// Returns a 1 if min_range <= x < max_range and zero otherwise
 pub fn range_check(
     composer: &mut StandardComposer,
     min_range: BlsScalar,
@@ -33,10 +33,10 @@ pub fn range_check(
     witness: AllocatedScalar,
 ) -> Variable {
     // Upper bound check
-    let (y2, num_bits_pow_2) = max_bound(composer, max_range, witness.clone());
+    let (y1, num_bits_pow_2) = max_bound(composer, max_range, witness.clone());
 
     // Lower bound check
-    let y1 = min_bound(composer, min_range, witness, num_bits_pow_2);
+    let y2 = min_bound(composer, min_range, witness, num_bits_pow_2);
 
     // Computes y1 * y2
     // If both lower and upper bound checks are true,
@@ -50,8 +50,8 @@ pub fn range_check(
     )
 }
 
-/// Returns a 0 or a 1, if the witness is greater than the minimum bound
-/// The statement a < x  , implies x - a > 0 , for all values x,a
+/// Returns a 0 or a 1, if the witness is greater than or equal to the minimum bound
+/// The statement a <= x  , implies x - a >= 0 , for all values x,a
 /// Instead of proving x - a is positive for all values in the field, it is sufficient to prove
 /// it is positive for a specific power of two.
 /// This power of two must be large enough to cover the whole range of values x and a can take
@@ -83,14 +83,17 @@ fn min_bound(
     range_proof(composer, x_min_a, num_bits)
 }
 
-/// Returns a 0 or a 1, if the witness is greater than the maximum bound ie x < b
+/// Returns a 0 or a 1, if the witness is greater than the maximum bound
+/// x < b which implies that b - x - 1 >= 0
 /// Note that since the maximum bound is public knowledge
-/// The num_bits can be computed
+/// the num_bits can be computed
 pub fn max_bound(
     composer: &mut StandardComposer,
     max_range: BlsScalar,
     witness: AllocatedScalar,
 ) -> (Variable, u64) {
+    let max_range = max_range - BlsScalar::one();
+
     // Since the upper bound is public, we can compute the number of bits in the closest power of two
     let num_bits_pow_2 = num_bits_closest_power_of_two(max_range);
 
@@ -164,7 +167,7 @@ fn maybe_equal(
 fn scalar_decomposition_gadget(
     composer: &mut StandardComposer,
     num_bits: usize,
-    witness: AllocatedScalar,
+    witness: AllocatedScalar, 
 ) -> (Variable, Vec<Variable>) {
     // Decompose the bits
     let scalar_bits = scalar_to_bits(&witness.scalar);
@@ -192,16 +195,15 @@ fn scalar_decomposition_gadget(
 
         composer.boolean_gate(*bit);
 
-        // XXX; This can be optimised to be a third of the gate count
         let two_pow = BlsScalar::from(2).pow(&[power as u64, 0, 0, 0]);
-
+        
         let q_l_a = (two_pow, *bit);
         let q_r_b = (BlsScalar::one(), accumulator.var);
         let q_c = BlsScalar::zero();
         let pi = BlsScalar::zero();
-
+        
         accumulator.var = composer.add(q_l_a, q_r_b, q_c, pi);
-
+        
         accumulator.scalar =
             accumulator.scalar + &two_pow * &BlsScalar::from(scalar_bits[power] as u64);
     }
@@ -290,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_equal() {
+    fn test_maybe_equal() {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 10, &mut rand::thread_rng())
             .expect("Pub Params generation error");
@@ -443,8 +445,20 @@ mod tests {
             TestCase {
                 min_range: BlsScalar::from(50_000u64),
                 max_range: BlsScalar::from(250_000u64),
-                witness: BlsScalar::from(49_999u64),
+                witness: BlsScalar::from(250_000u64),
                 expected_result: false,
+            },
+            TestCase {
+                min_range: BlsScalar::from(50_000u64),
+                max_range: BlsScalar::from(250_000u64),
+                witness: BlsScalar::from(249_000u64),
+                expected_result: true,
+            },
+            TestCase {
+                min_range: BlsScalar::from(50_000u64),
+                max_range: BlsScalar::from(250_000u64),
+                witness: BlsScalar::from(50_000u64),
+                expected_result: true,
             },
             TestCase {
                 min_range: BlsScalar::from(50_000u64),
