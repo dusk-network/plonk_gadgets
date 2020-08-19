@@ -4,6 +4,7 @@
 //! If you just need to do a normal rangeproof with boundaries being powers
 //! of two, we recomend to use the function builtin plonk for it: `composer.range_gate()`
 //! since it will introduce less constraints to your CS.
+
 use super::{scalar::maybe_equal, AllocatedScalar};
 use dusk_plonk::prelude::*;
 
@@ -124,14 +125,11 @@ fn scalar_decomposition_gadget(
     // Add all the bits into the composer
     let scalar_bits_var: Vec<Variable> = scalar_bits
         .iter()
-        .map(|bit| {
-            let var = composer.add_input(BlsScalar::from(*bit as u64));
-            var
-        })
+        .map(|bit| composer.add_input(BlsScalar::from(*bit as u64)))
         .collect();
 
     // Take the first n bits
-    let scalar_bits_var = scalar_bits_var[0..num_bits].to_vec().clone();
+    let scalar_bits_var = scalar_bits_var[0..num_bits].to_vec();
 
     // Now ensure that the bits correctly accumulate to the witness given
     // XXX: Expose a method called .zero() on composer
@@ -149,8 +147,7 @@ fn scalar_decomposition_gadget(
         let q_c = BlsScalar::zero();
         let pi = BlsScalar::zero();
         accumulator.var = composer.add(q_l_a, q_r_b, q_c, pi);
-        accumulator.scalar =
-            accumulator.scalar + &two_pow * &BlsScalar::from(scalar_bits[power] as u64);
+        accumulator.scalar += two_pow * BlsScalar::from(scalar_bits[power] as u64);
     }
 
     let is_equal = maybe_equal(composer, accumulator, witness);
@@ -186,8 +183,7 @@ fn bits_count(mut scalar: BlsScalar) -> u64 {
 fn num_bits_closest_power_of_two(scalar: BlsScalar) -> u64 {
     let num_bits = bits_count(scalar);
     let closest_pow_of_two = BlsScalar::from(2u64).pow(&[num_bits, 0, 0, 0]);
-    let num_bits_pow_2 = bits_count(closest_pow_of_two);
-    num_bits_pow_2
+    bits_count(closest_pow_of_two)
 }
 
 #[cfg(test)]
