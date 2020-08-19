@@ -17,7 +17,10 @@
     html_logo_url = "https://lh3.googleusercontent.com/SmwswGxtgIANTbDrCOn5EKcRBnVdHjmYsHYxLq2HZNXWCQ9-fZyaea-bNgdX9eR0XGSqiMFi=w128-h128-e365"
 )]
 #![doc(html_favicon_url = "https://dusk.network/lib/img/favicon-16x16.png")]
+// We need to perform bitshifting sometimes.
 #![allow(clippy::suspicious_arithmetic_impl)]
+// We have cases where we just have `Variables` which don't have any descriptive name.
+#![allow(clippy::many_single_char_names)]
 #![deny(broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]

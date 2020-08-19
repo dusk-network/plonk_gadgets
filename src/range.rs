@@ -23,7 +23,7 @@ pub fn range_check(
     witness: AllocatedScalar,
 ) -> Variable {
     // Upper bound check
-    let (y1, num_bits_pow_2) = max_bound(composer, max_range, witness.clone());
+    let (y1, num_bits_pow_2) = max_bound(composer, max_range, witness);
 
     // Lower bound check
     let y2 = min_bound(composer, min_range, witness, num_bits_pow_2);
