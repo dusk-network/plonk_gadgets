@@ -34,5 +34,7 @@ pub mod gadgets;
 pub use gadgets::scalar_gadgets::range as RangeGadgets;
 /// Container with all of the pure-Scalar gadgets.
 pub use gadgets::scalar_gadgets::scalar as ScalarGadgets;
+/// Export `AllocatedScalar` structure.
+pub use gadgets::scalar_gadgets::AllocatedScalar;
 /// Re-export of GadgetErrors.
 pub use gadgets::GadgetErrors;
