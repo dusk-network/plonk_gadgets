@@ -129,7 +129,7 @@ fn scalar_decomposition_gadget(
         .collect();
 
     // Take the first n bits
-    let scalar_bits_var = scalar_bits_var[0..num_bits].to_vec();
+    let scalar_bits_var = scalar_bits_var[..num_bits].to_vec();
 
     // Now ensure that the bits correctly accumulate to the witness given
     // XXX: Expose a method called .zero() on composer
@@ -182,13 +182,14 @@ fn bits_count(mut scalar: BlsScalar) -> u64 {
 // to the scalar and the closest power of two
 fn num_bits_closest_power_of_two(scalar: BlsScalar) -> u64 {
     let num_bits = bits_count(scalar);
-    let closest_pow_of_two = BlsScalar::from(2u64).pow(&[num_bits, 0, 0, 0]);
+    let closest_pow_of_two = BlsScalar::pow_of_2(num_bits);
     bits_count(closest_pow_of_two)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{Error, Result};
 
     fn max_bound_gadget(
         composer: &mut StandardComposer,
@@ -233,13 +234,10 @@ mod tests {
     }
 
     #[test]
-    fn test_maybe_equal() {
+    fn test_maybe_equal() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 10, &mut rand::thread_rng())
-            .expect("Pub Params generation error");
-        let (ck, vk) = pub_params
-            .trim(1 << 9)
-            .expect("Pub Params generation error");
+        let pub_params = PublicParameters::setup(1 << 10, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 9)?;
 
         let is_equal_gadget =
             |composer: &mut StandardComposer, num_1: u64, num_2: u64, result: bool| {
@@ -260,8 +258,8 @@ mod tests {
         let mut prover = Prover::new(b"testing");
         is_equal_gadget(prover.mut_cs(), 100, 100, true);
 
-        prover.preprocess(&ck).expect("Unexpected proving error");
-        let proof = prover.prove(&ck).expect("Unexpected proving error");
+        prover.preprocess(&ck)?;
+        let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
@@ -277,27 +275,26 @@ mod tests {
         let mut prover = Prover::new(b"testing");
         is_equal_gadget(prover.mut_cs(), 20, 3330, false);
 
-        prover.preprocess(&ck).expect("Unexpected proving error");
-        let proof = prover.prove(&ck).expect("Unexpected proving error");
+        prover.preprocess(&ck)?;
+        let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
         is_equal_gadget(verifier.mut_cs(), 0, 0, false);
 
-        verifier.preprocess(&ck).expect("Preprocessing error");
+        verifier.preprocess(&ck)?;
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
             .is_ok());
+
+        Ok(())
     }
 
     #[test]
-    fn max_bound_test() {
+    fn max_bound_test() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
-            .expect("Pub Params generation error");
-        let (ck, vk) = pub_params
-            .trim(1 << 10)
-            .expect("Pub Params generation error");
+        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 10)?;
 
         struct TestCase {
             max_range: BlsScalar,
@@ -337,8 +334,8 @@ mod tests {
                 case.witness,
                 case.expected_result,
             );
-            prover.preprocess(&ck).expect("Unexpected proving error");
-            let proof = prover.prove(&ck).expect("Unexpected proving error");
+            prover.preprocess(&ck)?;
+            let proof = prover.prove(&ck)?;
 
             // Verification
             let mut verifier = Verifier::default();
@@ -348,20 +345,18 @@ mod tests {
                 case.witness,
                 case.expected_result,
             );
-            verifier.preprocess(&ck).expect("Preprocessing error");
+            verifier.preprocess(&ck)?;
             assert!(verifier
                 .verify(&proof, &vk, &vec![BlsScalar::zero()])
                 .is_ok());
         }
+        Ok(())
     }
     #[test]
-    fn range_check_test() {
+    fn range_check_test() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
-            .expect("Pub Params generation error");
-        let (ck, vk) = pub_params
-            .trim(1 << 10)
-            .expect("Pub Params generation error");
+        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 10)?;
 
         struct TestCase {
             max_range: BlsScalar,
@@ -431,8 +426,8 @@ mod tests {
                 case.witness,
                 case.expected_result,
             );
-            prover.preprocess(&ck).expect("Unexpected proving error");
-            let proof = prover.prove(&ck).expect("Unexpected proving error");
+            prover.preprocess(&ck)?;
+            let proof = prover.prove(&ck)?;
 
             // Verification
             let mut verifier = Verifier::default();
@@ -443,21 +438,20 @@ mod tests {
                 case.witness,
                 case.expected_result,
             );
-            verifier.preprocess(&ck).expect("Preprocessing error");
+            verifier.preprocess(&ck)?;
             assert!(verifier
                 .verify(&proof, &vk, &vec![BlsScalar::zero()])
                 .is_ok());
         }
+
+        Ok(())
     }
 
     #[test]
-    fn scalar_decomposition_test() {
+    fn scalar_decomposition_test() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
-            .expect("Pub Params generation error");
-        let (ck, vk) = pub_params
-            .trim(1 << 10)
-            .expect("Pub Params generation error");
+        let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 10)?;
 
         // Proving
         let mut prover = Prover::new(b"testing");
@@ -467,7 +461,7 @@ mod tests {
         prover
             .mut_cs()
             .constrain_to_constant(is_eq, BlsScalar::zero(), BlsScalar::zero());
-        let proof = prover.prove(&ck).expect("Unexpected Proving error");
+        let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
@@ -478,10 +472,8 @@ mod tests {
             .mut_cs()
             .constrain_to_constant(is_eq, BlsScalar::zero(), BlsScalar::zero());
 
-        verifier.preprocess(&ck).expect("Error on preprocessing");
+        verifier.preprocess(&ck)?;
 
-        assert!(verifier
-            .verify(&proof, &vk, &vec![BlsScalar::zero()])
-            .is_ok());
+        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
 }

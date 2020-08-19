@@ -18,23 +18,17 @@
 )]
 #![doc(html_favicon_url = "https://dusk.network/lib/img/favicon-16x16.png")]
 #![allow(clippy::suspicious_arithmetic_impl)]
-// Some structs do not have AddAssign or MulAssign impl.
-#![allow(clippy::suspicious_op_assign_impl)]
-// Variables have always the same names in respect to wires.
-#![allow(clippy::many_single_char_names)]
-// Bool expr are usually easier to read with match statements.
-#![allow(clippy::match_bool)]
-#![deny(intra_doc_link_resolution_failure)]
+#![deny(broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-/// Container of all of the gadgets of the library.
-pub mod gadgets;
-/// Container with all of the range-check related gadgets.
-pub use gadgets::scalar_gadgets::range as RangeGadgets;
-/// Container with all of the pure-Scalar gadgets.
-pub use gadgets::scalar_gadgets::scalar as ScalarGadgets;
-/// Export `AllocatedScalar` structure.
-pub use gadgets::scalar_gadgets::AllocatedScalar;
-/// Re-export of GadgetErrors.
-pub use gadgets::GadgetErrors;
+
+pub mod allocated_scalar;
+pub mod errors;
+pub mod range;
+pub mod scalar;
+
+pub use crate::errors::GadgetErrors;
+pub use allocated_scalar::AllocatedScalar;
+pub use range as RangeGadgets;
+pub use scalar as ScalarGadgets;

@@ -1,8 +1,9 @@
-//! This module contains the implementation of all of the
-//! Scalar-related gadgets.
-pub mod range;
-pub mod scalar;
-use dusk_plonk::prelude::*;
+//! This module contains the implementation of the
+//! `AllocatedScalar` helper structure.
+use dusk_plonk::{
+    bls12_381::Scalar as BlsScalar,
+    constraint_system::{StandardComposer, Variable},
+};
 
 /// An allocated scalar holds the underlying witness assignment for the Prover
 /// and a dummy value for the verifier
