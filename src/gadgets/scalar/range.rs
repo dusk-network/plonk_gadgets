@@ -1,22 +1,11 @@
-//! Collection of range-checking gadgets for Bls12_381 scalars.
+//! Collection of range-checking gadgets.
+//!
+//! # Note
+//! If you just need to do a normal rangeproof with boundaries being powers
+//! of two, we recomend to use the function builtin plonk for it: `composer.range_gate()`
+//! since it will introduce less constraints to your CS.
+use super::{scalar::maybe_equal, AllocatedScalar};
 use dusk_plonk::prelude::*;
-
-/// An allocated scalar holds the underlying witness assignment for the Prover
-/// and a dummy value for the verifier
-/// XXX: This could possibly be added to the PLONK API
-#[derive(Clone)]
-pub struct AllocatedScalar {
-    pub var: Variable,
-    pub scalar: BlsScalar,
-}
-
-impl AllocatedScalar {
-    /// Allocates a BlsScalar into the constraint system as a witness
-    pub fn allocate(composer: &mut StandardComposer, scalar: BlsScalar) -> AllocatedScalar {
-        let var = composer.add_input(scalar);
-        AllocatedScalar { var, scalar }
-    }
-}
 
 /// Returns a 0 or a 1, if the value lies within the specified range
 /// We do this by decomposing the scalar and showing that it can be represented in x amount of bits
@@ -120,46 +109,6 @@ pub fn max_bound(
     )
 }
 
-/// Returns 1 if a = b and zero otherwise
-fn maybe_equal(
-    composer: &mut StandardComposer,
-    a: AllocatedScalar,
-    b: AllocatedScalar,
-) -> Variable {
-    // u = a - b
-    let u = {
-        let q_l_a = (BlsScalar::one(), a.var);
-        let q_r_b = (-BlsScalar::one(), b.var);
-        let q_c = BlsScalar::zero();
-        let pi = BlsScalar::zero();
-
-        composer.add(q_l_a, q_r_b, q_c, pi)
-    };
-
-    // compute z = inverse of u.
-    // This is zero for zero and non-zero otherwise
-    let u_scalar = a.scalar - b.scalar;
-    let u_inv_scalar = u_scalar.invert().unwrap_or(BlsScalar::zero());
-    let z = composer.add_input(u_inv_scalar);
-
-    // y = 1 - uz
-    let y = composer.mul(-BlsScalar::one(), z, u, BlsScalar::one(), BlsScalar::zero());
-
-    // yu = 0
-{
-    let a = y;
-    let b = u;
-    let c = u;
-    let q_m = BlsScalar::one();
-    let q_o = BlsScalar::zero();
-    let q_c = BlsScalar::zero();
-    let pi = BlsScalar::zero();
-
-    composer.mul_gate(a, b, c, q_m, q_o, q_c, pi);
-}
-    y
-}
-
 /// Decomposes a witness and constraints it to be equal to it's bit representation
 /// Returns a 0 or 1 if the witness can be represented in the specified number of bits
 /// This effectively makes it a rangeproof. If the witness can be represented in less than x bits, then
@@ -167,7 +116,7 @@ fn maybe_equal(
 fn scalar_decomposition_gadget(
     composer: &mut StandardComposer,
     num_bits: usize,
-    witness: AllocatedScalar, 
+    witness: AllocatedScalar,
 ) -> (Variable, Vec<Variable>) {
     // Decompose the bits
     let scalar_bits = scalar_to_bits(&witness.scalar);
@@ -192,18 +141,14 @@ fn scalar_decomposition_gadget(
     };
 
     for (power, bit) in scalar_bits_var.iter().enumerate() {
-
         composer.boolean_gate(*bit);
 
         let two_pow = BlsScalar::from(2).pow(&[power as u64, 0, 0, 0]);
-        
         let q_l_a = (two_pow, *bit);
         let q_r_b = (BlsScalar::one(), accumulator.var);
         let q_c = BlsScalar::zero();
         let pi = BlsScalar::zero();
-        
         accumulator.var = composer.add(q_l_a, q_r_b, q_c, pi);
-        
         accumulator.scalar =
             accumulator.scalar + &two_pow * &BlsScalar::from(scalar_bits[power] as u64);
     }
@@ -350,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn max_bound_test()  {
+    fn max_bound_test() {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 11, &mut rand::thread_rng())
             .expect("Pub Params generation error");
@@ -412,7 +357,6 @@ mod tests {
                 .verify(&proof, &vk, &vec![BlsScalar::zero()])
                 .is_ok());
         }
-
     }
     #[test]
     fn range_check_test() {
@@ -508,7 +452,6 @@ mod tests {
                 .verify(&proof, &vk, &vec![BlsScalar::zero()])
                 .is_ok());
         }
-
     }
 
     #[test]
@@ -544,6 +487,5 @@ mod tests {
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
             .is_ok());
-
     }
 }

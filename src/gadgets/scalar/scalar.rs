@@ -1,4 +1,8 @@
-///! Basic `Scalar` oriented gadgets collection.
+//! Basic `Scalar` oriented gadgets collection.
+//!
+//! This module actually contains conditional selection implementations as
+//! well as equalty-checking gadgets.
+use super::AllocatedScalar;
 use crate::gadgets::GadgetErrors;
 use anyhow::{Error, Result};
 use dusk_plonk::prelude::*;
@@ -97,6 +101,51 @@ pub fn is_non_zero(
     );
 
     Ok(())
+}
+
+/// Returns 1 if a = b and zero otherwise.
+///
+/// # NOTE
+/// If you need to check equality constraining it, this function is not intended for it,
+/// instead we recommend to use `composer.assert_equals()` or `composer.constraint_to_constant()`
+/// functions from `dusk-plonk` crate which will introduce less constraints to your circuit.
+pub fn maybe_equal(
+    composer: &mut StandardComposer,
+    a: AllocatedScalar,
+    b: AllocatedScalar,
+) -> Variable {
+    // u = a - b
+    let u = {
+        let q_l_a = (BlsScalar::one(), a.var);
+        let q_r_b = (-BlsScalar::one(), b.var);
+        let q_c = BlsScalar::zero();
+        let pi = BlsScalar::zero();
+
+        composer.add(q_l_a, q_r_b, q_c, pi)
+    };
+
+    // compute z = inverse of u.
+    // This is zero for zero and non-zero otherwise
+    let u_scalar = a.scalar - b.scalar;
+    let u_inv_scalar = u_scalar.invert().unwrap_or(BlsScalar::zero());
+    let z = composer.add_input(u_inv_scalar);
+
+    // y = 1 - uz
+    let y = composer.mul(-BlsScalar::one(), z, u, BlsScalar::one(), BlsScalar::zero());
+
+    // yu = 0
+    {
+        let a = y;
+        let b = u;
+        let c = u;
+        let q_m = BlsScalar::one();
+        let q_o = BlsScalar::zero();
+        let q_c = BlsScalar::zero();
+        let pi = BlsScalar::zero();
+
+        composer.mul_gate(a, b, c, q_m, q_o, q_c, pi);
+    }
+    y
 }
 
 mod tests {
