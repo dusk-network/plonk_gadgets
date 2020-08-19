@@ -6,17 +6,30 @@ os:
 matrix:
   fast_finish: false
   include:
+include:
   - rust: stable
+    install:
+    before_script:
+      - rustup component add clippy
+    script:
+      - cargo check
+      - cargo build --release --verbose --all
+      - cargo test --release --verbose --all
+      - cargo clippy -- -D warnings
 
+  - rust: beta
+    install:
+    script:
+      - cargo check
+      - cargo build --release --verbose --all
+      - cargo test --release --verbose --all
 
-before_install:
-  - sudo apt-get update
-
-# Main build
-script:
-  - cargo check
-  - cargo build --release --verbose --all
-  - cargo test --release --verbose --all
+  - rust: nightly
+    install:
+    script:
+      - cargo check
+      - cargo build --release --verbose --all
+      - cargo test --release --verbose --all
 
 
 # Send a notification to the Dusk build Status Telegram channel once the CI build completes
