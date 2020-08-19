@@ -1,3 +1,7 @@
+//! Gadget Errors Module.
+//!
+//! Includes the definitions of all of the possible errors that the gadgets
+//! might encounter with toghether with it's display message implementations.
 use thiserror::Error;
 
 /// Represents an error during the execution of one of the library gagets.
