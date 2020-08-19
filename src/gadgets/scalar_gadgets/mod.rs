@@ -11,7 +11,7 @@ use dusk_plonk::prelude::*;
 pub struct AllocatedScalar {
     /// Variable associated to the `Scalar`.
     pub var: Variable,
-    /// Scalar associated to the `Varaible`
+    /// Scalar associated to the `Variable`
     pub scalar: BlsScalar,
 }
 
