@@ -23,8 +23,8 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-pub mod allocated_scalar;
-pub mod errors;
+pub(crate) mod allocated_scalar;
+pub(crate) mod errors;
 pub mod range;
 pub mod scalar;
 
