@@ -7,7 +7,7 @@ use dusk_plonk::prelude::*;
 /// An allocated scalar holds the underlying witness assignment for the Prover
 /// and a dummy value for the verifier
 /// XXX: This could possibly be added to the PLONK API
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct AllocatedScalar {
     /// Variable associated to the `Scalar`.
     pub var: Variable,
