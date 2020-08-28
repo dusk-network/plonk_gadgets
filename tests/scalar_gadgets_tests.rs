@@ -1,3 +1,5 @@
+// Copyright (c) DUSK NETWORK. All rights reserved.
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
 extern crate anyhow;
 extern crate dusk_plonk;
 extern crate plonk_gadgets;

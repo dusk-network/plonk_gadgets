@@ -1,3 +1,5 @@
+// Copyright (c) DUSK NETWORK. All rights reserved.
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
 //! Basic `Scalar` oriented gadgets collection.
 //!
 //! This module actually contains conditional selection implementations as

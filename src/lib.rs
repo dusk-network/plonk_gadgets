@@ -1,3 +1,5 @@
+// Copyright (c) DUSK NETWORK. All rights reserved.
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
 //! # Plonk Gadgets
 //! This library cointains the gadgets that the Dusk-Network protocol needs to build it's ZK-Circuits.
 //! The library **contains generic gadgets** which are used across Dusk's tech stack, all of the other
