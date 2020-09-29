@@ -1,12 +1,12 @@
 [package]
 name = "plonk_gadgets"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["CPerezz <carlos@dusk.network>", "Kevaundray Wedderburn <kev@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 
 
 [dependencies]
-dusk-plonk = "0.2.8"
+dusk-plonk = {version = "0.2.11", features = ["trace-print"]}
 anyhow = "1.0.32"
 thiserror = "1.0.20"
 
