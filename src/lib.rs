@@ -27,7 +27,6 @@
 #![allow(clippy::suspicious_arithmetic_impl)]
 // We have cases where we just have `Variables` which don't have any descriptive name.
 #![allow(clippy::many_single_char_names)]
-#![deny(broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
