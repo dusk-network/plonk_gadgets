@@ -7,7 +7,7 @@
 //! This module contains the implementation of the
 //! `AllocatedScalar` helper structure.
 use dusk_plonk::{
-    bls12_381::Scalar as BlsScalar,
+    bls12_381::BlsScalar,
     constraint_system::{StandardComposer, Variable},
 };
 
