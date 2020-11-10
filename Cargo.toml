@@ -6,7 +6,7 @@ edition = "2018"
 
 
 [dependencies]
-dusk-plonk = {version = "0.3.3", features = ["trace-print"]}
+dusk-plonk = {version = "0.3.4", features = ["trace-print"]}
 anyhow = "1"
 thiserror = "1"
 
