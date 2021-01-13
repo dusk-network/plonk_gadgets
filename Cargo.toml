@@ -6,10 +6,10 @@ edition = "2018"
 
 
 [dependencies]
-dusk-plonk = {version = "0.3.4", features = ["trace-print"]}
+dusk-plonk = {git="https://github.com/dusk-network/plonk", branch="vlopes11/332-proverkey-from-unchecked"}
 anyhow = "1"
 thiserror = "1"
 
 [dev-dependencies]
-rand = "0.7.3"
-rand_core = "0.5.1"
+rand = "0.7"
+rand_core = "0.5"
