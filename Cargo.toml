@@ -1,12 +1,12 @@
 [package]
 name = "plonk_gadgets"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["CPerezz <carlos@dusk.network>", "Kevaundray Wedderburn <kev@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 
-
 [dependencies]
-dusk-plonk = {git="https://github.com/dusk-network/plonk", branch="vlopes11/332-proverkey-from-unchecked"}
+dusk-bytes = "0.1"
+dusk-plonk = "0.4"
 anyhow = "1"
 thiserror = "1"
 

@@ -12,6 +12,7 @@
 //! since it will introduce less constraints to your CS.
 
 use super::{scalar::maybe_equal, AllocatedScalar};
+use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 
 /// Returns a 0 or a 1, if the value lies within the specified range
