@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 dusk-bytes = "0.1"
-dusk-plonk = "0.4"
+dusk-plonk = "0.5"
 anyhow = "1"
 thiserror = "1"
 
