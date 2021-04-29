@@ -18,8 +18,6 @@ exclude = [
 [dependencies]
 dusk-bytes = "0.1"
 dusk-plonk = "0.8.0-rc.1"
-anyhow = "1"
-thiserror = "1"
 
 [dev-dependencies]
 rand = "0.8"

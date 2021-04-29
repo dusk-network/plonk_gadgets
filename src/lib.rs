@@ -32,11 +32,11 @@
 #![deny(unsafe_code)]
 
 pub(crate) mod allocated_scalar;
-pub(crate) mod errors;
+pub mod errors;
 pub mod range;
 pub mod scalar;
 
-pub use crate::errors::GadgetErrors;
+pub use crate::errors::Error;
 pub use allocated_scalar::AllocatedScalar;
 pub use range as RangeGadgets;
 pub use scalar as ScalarGadgets;
