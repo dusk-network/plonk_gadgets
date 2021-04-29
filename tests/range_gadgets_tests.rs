@@ -28,7 +28,7 @@ mod tests {
         if result {
             outcome = BlsScalar::one()
         }
-        composer.constrain_to_constant(res, outcome, BlsScalar::zero());
+        composer.constrain_to_constant(res, outcome, None);
     }
 
     fn range_check_gadget(
@@ -45,7 +45,7 @@ mod tests {
         if result {
             outcome = BlsScalar::one()
         }
-        composer.constrain_to_constant(res, outcome, BlsScalar::zero());
+        composer.constrain_to_constant(res, outcome, None);
     }
 
     #[test]

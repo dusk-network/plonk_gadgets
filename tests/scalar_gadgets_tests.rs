@@ -32,7 +32,7 @@ mod tests {
                 if result {
                     outcome = BlsScalar::one()
                 }
-                composer.constrain_to_constant(bit, outcome, BlsScalar::zero());
+                composer.constrain_to_constant(bit, outcome, None);
             };
 
         // Proving
@@ -80,7 +80,7 @@ mod tests {
             let value = composer.add_input(value);
             let selector = composer.add_input(selector);
             let res = conditionally_select_zero(composer, value, selector);
-            composer.constrain_to_constant(res, BlsScalar::zero(), BlsScalar::zero());
+            composer.constrain_to_constant(res, BlsScalar::zero(), None);
         };
 
         // Generate Composer & Public Parameters
@@ -137,7 +137,7 @@ mod tests {
             let value = composer.add_input(value);
             let selector = composer.add_input(selector);
             let res = conditionally_select_one(composer, value, selector);
-            composer.constrain_to_constant(res, BlsScalar::zero(), -expected_result);
+            composer.constrain_to_constant(res, BlsScalar::zero(), Some(-expected_result));
         };
 
         // Generate Composer & Public Parameters
@@ -153,7 +153,7 @@ mod tests {
             BlsScalar::zero(),
             BlsScalar::one(),
         );
-        let mut pi = prover.mut_cs().public_inputs.clone();
+        let mut pi = prover.mut_cs().construct_dense_pi_vec().clone();
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -175,11 +175,13 @@ mod tests {
         prover.clear_witness();
         let rand = BlsScalar::random(&mut rand::thread_rng());
         circuit(prover.mut_cs(), rand, BlsScalar::one(), rand);
-        pi = prover.mut_cs().public_inputs.clone();
+        pi = prover.mut_cs().construct_dense_pi_vec().clone();
         let proof = prover.prove(&ck)?;
         // This should pass since we sent 1 as selector and the circuit closure should assign the randomly-generated
         // value as a result.
-        verifier.verify(&proof, &vk, &pi)
+        verifier
+            .verify(&proof, &vk, &pi)
+            .map_err(|e| anyhow::anyhow!(e))
     }
 
     #[test]
@@ -213,7 +215,7 @@ mod tests {
             BlsScalar::random(&mut rand::thread_rng()),
         )
         .is_ok());
-        let mut pi = prover.mut_cs().public_inputs.clone();
+        let mut pi = prover.mut_cs().construct_dense_pi_vec().clone();
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -232,10 +234,12 @@ mod tests {
         prover.clear_witness();
         let rand = BlsScalar::random(&mut rand::thread_rng());
         circuit(prover.mut_cs(), rand, rand)?;
-        pi = prover.mut_cs().public_inputs.clone();
+        pi = prover.mut_cs().construct_dense_pi_vec().clone();
         let proof = prover.prove(&ck)?;
         // This should pass since we sent 1 as selector and the circuit closure should assign the randomly-generated
         // value as a result.
-        verifier.verify(&proof, &vk, &pi)
+        verifier
+            .verify(&proof, &vk, &pi)
+            .map_err(|e| anyhow::anyhow!(e))
     }
 }

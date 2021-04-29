@@ -24,13 +24,7 @@ pub fn conditionally_select_zero(
     x: Variable,
     select: Variable,
 ) -> Variable {
-    composer.mul(
-        BlsScalar::one(),
-        x,
-        select,
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-    )
+    composer.mul(BlsScalar::one(), x, select, BlsScalar::zero(), None)
 }
 
 /// Conditionally selects the value provided or a one instead.
@@ -47,19 +41,13 @@ pub fn conditionally_select_one(
 ) -> Variable {
     let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     // selector * y
-    let selector_y = composer.mul(
-        BlsScalar::one(),
-        y,
-        selector,
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-    );
+    let selector_y = composer.mul(BlsScalar::one(), y, selector, BlsScalar::zero(), None);
     // 1 - selector
     let one_min_selector = composer.add(
         (BlsScalar::one(), one),
         (-BlsScalar::one(), selector),
         BlsScalar::zero(),
-        BlsScalar::zero(),
+        None,
     );
 
     // selector * y + (1 - selector)
@@ -67,7 +55,7 @@ pub fn conditionally_select_one(
         (BlsScalar::one(), selector_y),
         (BlsScalar::one(), one_min_selector),
         BlsScalar::zero(),
-        BlsScalar::zero(),
+        None,
     )
 }
 
@@ -103,7 +91,7 @@ pub fn is_non_zero(
         BlsScalar::zero(),
         -BlsScalar::one(),
         BlsScalar::zero(),
-        BlsScalar::zero(),
+        None,
     );
 
     Ok(())
@@ -125,9 +113,8 @@ pub fn maybe_equal(
         let q_l_a = (BlsScalar::one(), a.var);
         let q_r_b = (-BlsScalar::one(), b.var);
         let q_c = BlsScalar::zero();
-        let pi = BlsScalar::zero();
 
-        composer.add(q_l_a, q_r_b, q_c, pi)
+        composer.add(q_l_a, q_r_b, q_c, None)
     };
 
     // compute z = inverse of u.
@@ -137,7 +124,7 @@ pub fn maybe_equal(
     let z = composer.add_input(u_inv_scalar);
 
     // y = 1 - uz
-    let y = composer.mul(-BlsScalar::one(), z, u, BlsScalar::one(), BlsScalar::zero());
+    let y = composer.mul(-BlsScalar::one(), z, u, BlsScalar::one(), None);
 
     // yu = 0
     {
@@ -147,9 +134,8 @@ pub fn maybe_equal(
         let q_m = BlsScalar::one();
         let q_o = BlsScalar::zero();
         let q_c = BlsScalar::zero();
-        let pi = BlsScalar::zero();
 
-        composer.mul_gate(a, b, c, q_m, q_o, q_c, pi);
+        composer.mul_gate(a, b, c, q_m, q_o, q_c, None);
     }
     y
 }
