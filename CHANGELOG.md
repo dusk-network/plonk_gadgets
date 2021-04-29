@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Remove
+- Remove `anyhow` and `thiserror`. [#39](https://github.com/dusk-network/plonk_gadgets/issues/39)
+
 ## [v0.5.0] - 13-01-21
 
 ### Change
