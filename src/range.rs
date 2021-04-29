@@ -12,6 +12,7 @@
 //! since it will introduce less constraints to your CS.
 
 use super::{scalar::maybe_equal, AllocatedScalar};
+use alloc::vec::Vec;
 use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 
@@ -227,6 +228,6 @@ mod tests {
 
         verifier.preprocess(&ck)?;
 
-        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
+        verifier.verify(&proof, &vk, &alloc::vec![BlsScalar::zero()])
     }
 }
