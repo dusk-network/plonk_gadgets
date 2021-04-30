@@ -1,7 +1,7 @@
 # Plonk Gadgets
-![Build Status](https://github.com/dusk-network/plonk/workflows/Continuous%20integration/badge.svg)
-[![Repository](https://img.shields.io/badge/github-plonk-blueviolet?logo=github)](https://github.com/dusk-network/plonk)
-[![Documentation](https://img.shields.io/badge/docs-plonk-blue?logo=rust)](https://docs.rs/plonk/)
+![Build Status](https://github.com/dusk-network/plonk_gadgets/workflows/Continuous%20integration/badge.svg)
+[![Repository](https://img.shields.io/badge/github-plonk_gadgets-blueviolet?logo=github)](https://github.com/dusk-network/plonk_gadgets)
+[![Documentation](https://img.shields.io/badge/docs-plonk_gadgets-blue?logo=rust)](https://docs.rs/plonk_gadgets/)
 
 
 This library cointains the gadgets that the Dusk-Network protocol needs to build it's ZK-Circuits.
