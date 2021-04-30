@@ -191,6 +191,7 @@ fn num_bits_closest_power_of_two(scalar: BlsScalar) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn counting_scalar_bits() {
@@ -228,6 +229,6 @@ mod tests {
 
         verifier.preprocess(&ck)?;
 
-        verifier.verify(&proof, &vk, &alloc::vec![BlsScalar::zero()])
+        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
 }
