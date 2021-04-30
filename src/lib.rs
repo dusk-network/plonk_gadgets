@@ -30,6 +30,9 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
+#![no_std]
+
+extern crate alloc;
 
 pub(crate) mod allocated_scalar;
 pub mod errors;

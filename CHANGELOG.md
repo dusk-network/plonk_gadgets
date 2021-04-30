@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Add
+- Add `std` feature to crate [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
+
+### Change
+- Change crate to be `no_std` by default [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
+- Update `rand` from `v0.7` to `v0.8` [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
+
 ### Remove
 - Remove `anyhow` and `thiserror`. [#39](https://github.com/dusk-network/plonk_gadgets/issues/39)
+- Remove `rand_core` from dev-deps [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
 
 ## [v0.5.0] - 13-01-21
 
