@@ -8,13 +8,11 @@
 //!
 //! Includes the definitions of all of the possible errors that the gadgets
 //! might encounter with toghether with it's display message implementations.
-use thiserror::Error;
 
 /// Represents an error during the execution of one of the library gagets.
-#[derive(Error, Debug)]
-pub enum GadgetErrors {
+#[derive(Debug)]
+pub enum Error {
     /// Error returned when we try to compute the inverse of a number which is
     /// non-QR (doesn't have an inverse inside of the field)
-    #[error("error on the computation of an inverse")]
     NonExistingInverse,
 }

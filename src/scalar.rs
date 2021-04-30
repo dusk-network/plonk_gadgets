@@ -9,8 +9,7 @@
 //! This module actually contains conditional selection implementations as
 //! well as equalty-checking gadgets.
 use super::AllocatedScalar;
-use crate::errors::GadgetErrors;
-use anyhow::{Error, Result};
+use crate::Error as GadgetsError;
 use dusk_plonk::prelude::*;
 
 /// Conditionally selects the value provided or a zero instead.
@@ -65,7 +64,7 @@ pub fn is_non_zero(
     composer: &mut StandardComposer,
     var: Variable,
     value_assigned: BlsScalar,
-) -> Result<(), Error> {
+) -> Result<(), GadgetsError> {
     // Add original scalar which is equal to `var`.
     let var_assigned = composer.add_input(value_assigned);
     // Constrain `var` to actually be equal to the `var_assigment` provided.
@@ -77,7 +76,7 @@ pub fn is_non_zero(
         // Safe to unwrap here.
         inv = composer.add_input(inverse.unwrap());
     } else {
-        return Err(GadgetErrors::NonExistingInverse.into());
+        return Err(GadgetsError::NonExistingInverse);
     }
 
     // Var * Inv(Var) = 1

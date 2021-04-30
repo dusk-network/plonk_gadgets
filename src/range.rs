@@ -12,6 +12,7 @@
 //! since it will introduce less constraints to your CS.
 
 use super::{scalar::maybe_equal, AllocatedScalar};
+use alloc::vec::Vec;
 use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 
@@ -190,7 +191,7 @@ fn num_bits_closest_power_of_two(scalar: BlsScalar) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Error, Result};
+    use alloc::vec;
 
     #[test]
     fn counting_scalar_bits() {
@@ -228,8 +229,6 @@ mod tests {
 
         verifier.preprocess(&ck)?;
 
-        verifier
-            .verify(&proof, &vk, &vec![BlsScalar::zero()])
-            .map_err(|e| anyhow::anyhow!(e))
+        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
 }

@@ -17,10 +17,12 @@ exclude = [
 
 [dependencies]
 dusk-bytes = "0.1"
-dusk-plonk = "0.8.0-rc.1"
-anyhow = "1"
-thiserror = "1"
+dusk-plonk = {version = "0.8.0-rc.1", default-features = false, features = ["alloc"]}
 
 [dev-dependencies]
 rand = "0.8"
-rand_core = "0.5"
+
+[features]
+std = [
+    "dusk-plonk/std"
+]
