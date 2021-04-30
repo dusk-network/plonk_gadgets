@@ -12,6 +12,7 @@
 //! since it will introduce less constraints to your CS.
 
 use super::{scalar::maybe_equal, AllocatedScalar};
+use alloc::vec::Vec;
 use dusk_bytes::Serializable;
 use dusk_plonk::prelude::*;
 
@@ -38,13 +39,7 @@ pub fn range_check(
     // Computes y1 * y2
     // If both lower and upper bound checks are true,
     // then this will return 1 otherwise it returns 0
-    composer.mul(
-        BlsScalar::one(),
-        y1,
-        y2,
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-    )
+    composer.mul(BlsScalar::one(), y1, y2, BlsScalar::zero(), None)
 }
 
 /// Returns a 0 or a 1, if the witness is greater than or equal to the minimum bound
@@ -66,8 +61,8 @@ fn min_bound(
         let q_l_a = (BlsScalar::one(), witness.var);
         let q_r_b = (BlsScalar::zero(), witness.var); // XXX: Expose composer.zero()
         let q_c = -min_range;
-        let pi = BlsScalar::zero();
-        composer.add(q_l_a, q_r_b, q_c, pi)
+
+        composer.add(q_l_a, q_r_b, q_c, None)
     };
 
     // Compute witness assignment value for x - a
@@ -99,8 +94,8 @@ pub fn max_bound(
         let q_l_a = (-BlsScalar::one(), witness.var);
         let q_r_b = (BlsScalar::zero(), witness.var); // XXX: Expose composer.zero()
         let q_c = max_range;
-        let pi = BlsScalar::zero();
-        composer.add(q_l_a, q_r_b, q_c, pi)
+
+        composer.add(q_l_a, q_r_b, q_c, None)
     };
 
     // Compute witness assignment value for b - x
@@ -152,8 +147,8 @@ fn scalar_decomposition_gadget(
         let q_l_a = (two_pow, *bit);
         let q_r_b = (BlsScalar::one(), accumulator.var);
         let q_c = BlsScalar::zero();
-        let pi = BlsScalar::zero();
-        accumulator.var = composer.add(q_l_a, q_r_b, q_c, pi);
+
+        accumulator.var = composer.add(q_l_a, q_r_b, q_c, None);
         accumulator.scalar += two_pow * BlsScalar::from(scalar_bits[power] as u64);
     }
 
@@ -196,7 +191,7 @@ fn num_bits_closest_power_of_two(scalar: BlsScalar) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Error, Result};
+    use alloc::vec;
 
     #[test]
     fn counting_scalar_bits() {
@@ -220,7 +215,7 @@ mod tests {
         let (is_eq, _) = scalar_decomposition_gadget(prover.mut_cs(), 8, witness);
         prover
             .mut_cs()
-            .constrain_to_constant(is_eq, BlsScalar::zero(), BlsScalar::zero());
+            .constrain_to_constant(is_eq, BlsScalar::zero(), None);
         let proof = prover.prove(&ck)?;
 
         // Verification
@@ -230,7 +225,7 @@ mod tests {
         let (is_eq, _) = scalar_decomposition_gadget(verifier.mut_cs(), 8, witness);
         verifier
             .mut_cs()
-            .constrain_to_constant(is_eq, BlsScalar::zero(), BlsScalar::zero());
+            .constrain_to_constant(is_eq, BlsScalar::zero(), None);
 
         verifier.preprocess(&ck)?;
 
