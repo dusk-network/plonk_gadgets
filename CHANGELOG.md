@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Add
-- Add `std-plonk` feature to crate [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
+- Add `std` feature to crate [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
 
 ### Change
 - Change crate to be `no_std` by default [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)

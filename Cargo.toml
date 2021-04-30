@@ -23,6 +23,6 @@ dusk-plonk = {version = "0.8.0-rc.1", default-features = false, features = ["all
 rand = "0.8"
 
 [features]
-std-plonk = [
+std = [
     "dusk-plonk/std"
 ]
