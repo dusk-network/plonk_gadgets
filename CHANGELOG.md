@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 06-07-21
+
 ### Add
 - Add `std` feature to crate [#42](https://github.com/dusk-network/plonk_gadgets/issues/42)
 
